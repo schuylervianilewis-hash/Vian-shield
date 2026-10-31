@@ -69,12 +69,12 @@ class DiagnosticViewModel(application: Application) : AndroidViewModel(applicati
     private val _sortNewestFirst = MutableStateFlow(true)
     val sortNewestFirst: StateFlow<Boolean> = _sortNewestFirst.asStateFlow()
 
-    private val _currentConfig = MutableStateFlow(WireGuardConfigParser.createDefaultTestConfig())
+    private val _currentConfig = MutableStateFlow("")
     val currentConfig: StateFlow<String> = _currentConfig.asStateFlow()
 
     val activeProfile: StateFlow<WireGuardProfile?> = _currentConfig.map { conf ->
-        WireGuardConfigParser.parse(conf).getOrNull()
-    }.stateIn(viewModelScope, SharingStarted.Eagerly, WireGuardConfigParser.parse(_currentConfig.value).getOrNull())
+        if (conf.isBlank()) null else WireGuardConfigParser.parse(conf).getOrNull()
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
     private val _importedProfilePreview = MutableStateFlow<WireGuardProfile?>(null)
     val importedProfilePreview: StateFlow<WireGuardProfile?> = _importedProfilePreview.asStateFlow()
@@ -115,17 +115,7 @@ class DiagnosticViewModel(application: Application) : AndroidViewModel(applicati
         val isDefault: Boolean = false
     )
 
-    private val _savedProfiles = MutableStateFlow<List<SavedProfileItem>>(
-        listOf(
-            SavedProfileItem(
-                id = "default_test_profile",
-                name = "Default WireGuard Profile",
-                endpoint = "203.0.113.5:51820",
-                rawConfig = WireGuardConfigParser.createDefaultTestConfig(),
-                isDefault = true
-            )
-        )
-    )
+    private val _savedProfiles = MutableStateFlow<List<SavedProfileItem>>(emptyList())
     val savedProfiles: StateFlow<List<SavedProfileItem>> = _savedProfiles.asStateFlow()
 
     // Bounded and filtered events stream for Log Keeper UI
@@ -196,11 +186,11 @@ class DiagnosticViewModel(application: Application) : AndroidViewModel(applicati
     }
 
     fun resetToDefaultConfig() {
-        _currentConfig.value = WireGuardConfigParser.createDefaultTestConfig()
+        _currentConfig.value = ""
         OperationalLogCatcher.info(
             LogCategory.CONFIG_VALIDATION,
             "DiagnosticViewModel",
-            "Reset active WireGuard configuration to default test profile"
+            "Cleared active WireGuard profile"
         )
     }
 
