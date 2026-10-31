@@ -45,7 +45,7 @@ object LogExporter {
             append("OS Platform:        Android ").append(Build.VERSION.RELEASE)
                 .append(" (API ").append(Build.VERSION.SDK_INT).append(")\n")
             append("Device:             ").append(Build.MANUFACTURER).append(" ").append(Build.MODEL).append("\n")
-            append("Engine Pinned:      sing-box v1.11.0\n")
+            append("VPN Engine:         Not integrated in this build\n")
             append("Total Events:       ").append(events.size).append("\n")
             append("Persistent Disk:    ").append(OperationalLogCatcher.getDiskLogSizeBytes()).append(" bytes (Cap: 3 MiB)\n")
             append("Memory Bound:       500 entries FIFO\n")
@@ -84,8 +84,7 @@ object LogExporter {
             append("====================================================\n")
             append("Export Timestamp: ").append(SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS", Locale.US).format(Date())).append("\n")
             append("Total Reports:    ").append(reports.size).append("\n")
-            append("Native Crash Note: Fatal C/Go signals (SIGSEGV/SIGABRT) bypass JVM exception handlers\n")
-            append("                   and are captured by Android OS tombstone logs (/data/tombstones).\n")
+            append("Native Crash Note: Native engine diagnostics will be added with the selected runtime.\n")
             append("====================================================\n\n")
 
             reports.forEachIndexed { index, report ->
