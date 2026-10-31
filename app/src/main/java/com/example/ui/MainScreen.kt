@@ -80,7 +80,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.engine.SingBoxAdapter
 import com.example.ui.theme.SkyBlueBackground
 import com.example.ui.theme.SkyBlueOnPrimaryContainer
 import com.example.ui.theme.SkyBluePrimary
@@ -735,7 +734,7 @@ private fun PrimaryActionButton(
             "Tunneling through $endpoint"
         }
         vpnState is VpnState.Starting -> "Establishing secure UDP tunnel..."
-        vpnState is VpnState.Stopping -> "Stopping sing-box engine..."
+        vpnState is VpnState.Stopping -> "Stopping VPN runtime..."
         vpnState is VpnState.Error -> "Failed to establish tunnel"
         else -> "Tap power button to connect"
     }
@@ -984,14 +983,14 @@ private fun ConnectionStatusCard(
                         modifier = Modifier
                             .size(6.dp)
                             .clip(CircleShape)
-                            .background(if (SingBoxAdapter.isNativeAvailable()) StatusConnected else StatusStarting)
+                            .background(if (false) StatusConnected else StatusStarting)
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
                         text = if (SingBoxAdapter.isNativeAvailable())
-                            "libbox Native Core Linked"
+                            "VPN engine not integrated"
                         else
-                            "Native Core Bridge Pending",
+                            "Runtime integration pending",
                         fontSize = 10.sp,
                         color = SkyBlueTextSecondary,
                         fontWeight = FontWeight.Medium
