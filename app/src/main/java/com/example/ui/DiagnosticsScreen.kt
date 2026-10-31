@@ -51,7 +51,6 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.engine.SingBoxAdapter
 import com.example.ui.theme.SkyBlueBackground
 import com.example.ui.theme.SkyBlueOnPrimaryContainer
 import com.example.ui.theme.SkyBluePrimary
@@ -79,7 +78,7 @@ fun DiagnosticsScreen(
     BackHandler { onBack() }
 
     val vpnState by viewModel.vpnState.collectAsState()
-    val isNativeAvailable = SingBoxAdapter.isNativeAvailable()
+    val isNativeAvailable = false
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
@@ -153,7 +152,7 @@ fun DiagnosticsScreen(
                             color = if (isNativeAvailable) SkyBluePrimaryContainer else Color(0xFFFEF3C7)
                         ) {
                             Text(
-                                text = if (isNativeAvailable) "libbox Native" else "SFA Lifecycle Bridge",
+                                text = "Engine not integrated",
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.SemiBold,
                                 color = if (isNativeAvailable) SkyBlueOnPrimaryContainer else Color(0xFF92400E),
@@ -164,15 +163,15 @@ fun DiagnosticsScreen(
 
                     Spacer(modifier = Modifier.height(12.dp))
 
-                    DiagnosticRow("Pinned Engine Version", "sing-box v1.14.4")
-                    DiagnosticRow("Native libbox.aar Presence", if (isNativeAvailable) "Loaded & Verified (SFA f87c2eb)" else "Pending CI AAR build")
-                    DiagnosticRow("Integration Architecture", "SFA / BitProxy Command-Client Lifecycle")
-                    DiagnosticRow("Userspace Network Stack", "gVisor (non-root Android userspace)")
+                    DiagnosticRow("VPN Engine", "Not integrated — protection unavailable")
+                    DiagnosticRow("Native Engine", "No engine binary included")
+                    DiagnosticRow("Integration Architecture", "Engine-neutral Android VPN service")
+                    DiagnosticRow("Userspace Network Stack", "Pending runtime integration")
                     DiagnosticRow("Socket Loop Protection", "VpnService.protect(fd) enforced")
                     DiagnosticRow("Sandbox Storage Paths", "filesDir / cacheDir (App-Private)")
-                    DiagnosticRow("Config Validation", "Verified via Libbox.checkConfig")
-                    DiagnosticRow("Lifecycle Serialization", "Mutex protected with 10s watchdog")
-                    DiagnosticRow("Teardown Ordering", "BoxService.stop() -> TUN close")
+                    DiagnosticRow("Config Validation", "WireGuard profile parser only")
+                    DiagnosticRow("Lifecycle Serialization", "Android service lifecycle")
+                    DiagnosticRow("Teardown Ordering", "No active engine or TUN in this build")
                 }
             }
 
