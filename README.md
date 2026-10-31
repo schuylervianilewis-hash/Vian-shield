@@ -1,22 +1,41 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://ai.google.dev/static/site-assets/images/share-ais-513315318.png" />
-</div>
+# Vianshield
 
-# Run and deploy your AI Studio app
+Vianshield is an Android firewall/VPN project being prepared as a standalone app before its proven networking feature is integrated into Sidebar.
 
-This contains everything you need to run your app locally.
+## Current development status
 
-View your app in AI Studio: https://ai.studio/apps/c24895fd-38f8-4fba-8cfe-86514c9617c3
+The engine-neutral purge is in progress on the branch:
 
-## Run Locally
+`refactor/engine-neutral-purge`
 
-**Prerequisites:**  [Android Studio](https://developer.android.com/studio)
+The previous Sing-box integration has been removed from this branch. The Android VPN service shell deliberately fails closed until the selected TrackerControl-based runtime is integrated. It must not report protection as active while no VPN engine is running.
 
+The current standalone app retains the Vianshield Compose UI, WireGuard profile parsing/import, operational logging, Log Keeper, crash reporting and the Gradle APK build pipeline.
 
-1. Open Android Studio
-2. Select **Open** and choose the directory containing this project
-3. Allow Android Studio to fix any incompatibilities as it imports the project.
-4. Create a file named `.env` in the project directory and set `GEMINI_API_KEY` in that file to your Gemini API key (see `.env.example` for an example)
-5. Remove this line from the app's `build.gradle.kts` file: `signingConfig = signingConfigs.getByName("debugConfig")`
-6. Run the app on an emulator or physical device
-7. If you have already published your app in AI Studio, please [request upload key reset](https://support.google.com/googleplay/android-developer/answer/9842756#zippy=%2Crequest-an-upload-key-reset) in Google Play Console.
+## Build locally
+
+Prerequisites:
+- Android Studio with a compatible Android SDK.
+- JDK 17.
+- Android Gradle Plugin / Gradle versions declared by the project.
+
+Open the repository in Android Studio, sync Gradle, then run:
+
+```bash
+gradle :app:testDebugUnitTest
+gradle :app:assembleDebug
+```
+
+The debug APK is generated under:
+
+`app/build/outputs/apk/debug/app-debug.apk`
+
+The GitHub Actions workflow also stages and uploads a debug APK artifact. The app is configured for ARMv7 and ARM64.
+
+## Architecture and roadmap
+
+See [BLUEPRINT.md](BLUEPRINT.md) for the current architecture, TrackerControl integration sequence, Sidebar Main/Heavy process plan, validation requirements and build pipeline.
+
+## Important
+
+The current purge branch is a preparation/cleanup build, not a functioning firewall VPN. VPN start requests report that the engine is unavailable. Real traffic enforcement will be restored only after the selected runtime is integrated and verified.
