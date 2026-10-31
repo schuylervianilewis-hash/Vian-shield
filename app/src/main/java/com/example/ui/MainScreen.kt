@@ -987,7 +987,7 @@ private fun ConnectionStatusCard(
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
-                        text = if (SingBoxAdapter.isNativeAvailable())
+                        text = if (false)
                             "VPN engine not integrated"
                         else
                             "Runtime integration pending",
