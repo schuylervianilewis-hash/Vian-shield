@@ -501,9 +501,9 @@ fun SettingsScreen(
 
                     SettingInfoRow("App Name", "Vianshield")
                     SettingInfoRow("Version", "1.0 (Build 2026.10)")
-                    SettingInfoRow("sing-box Core Engine", "SagerNet/sing-box v1.14.4")
+                    SettingInfoRow("VPN Engine", "Pending TrackerControl integration")
                     SettingInfoRow("Target Architecture", "Dual-ARM (armeabi-v7a + arm64-v8a)")
-                    SettingInfoRow("TUN Interface", "vianshield-tun (gVisor Userspace Stack)")
+                    SettingInfoRow("TUN Interface", "Provided by the selected VPN runtime")
                     SettingInfoRow("Privacy & Tracking", "Zero Telemetry | 100% On-Device")
                 }
             }
