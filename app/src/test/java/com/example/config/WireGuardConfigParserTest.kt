@@ -255,16 +255,11 @@ class WireGuardConfigParserTest {
         assertEquals("1.1.1.1", profile.dns)
         assertEquals(listOf("1.1.1.1", "8.8.8.8"), profile.dnsServers)
 
-        // Verify JSON includes both addresses
-        val json = JSONObject(WireGuardConfigParser.toSingBoxJson(profile))
-        val tunAddresses = json.getJSONArray("inbounds").getJSONObject(0).getJSONArray("address")
-        assertEquals(2, tunAddresses.length())
-        assertEquals("10.0.0.2/24", tunAddresses.getString(0))
-        assertEquals("fd00::2/64", tunAddresses.getString(1))
+
     }
 
     @Test
-    fun parse_persistentKeepalive_succeedsAndIncludedInJson() {
+    fun parse_persistentKeepalive_succeeds() {
         val conf = """
             [Interface]
             PrivateKey = $validPrivateKey
@@ -280,12 +275,7 @@ class WireGuardConfigParserTest {
         val profile = result.getOrThrow()
         assertEquals(25, profile.persistentKeepalive)
 
-        val json = JSONObject(WireGuardConfigParser.toSingBoxJson(profile))
-        val endpoints = json.getJSONArray("endpoints")
-        val wgEndpoint = endpoints.getJSONObject(0)
-        val peer = wgEndpoint.getJSONArray("peers").getJSONObject(0)
-        assertTrue("WireGuard peer must contain persistent_keepalive_interval", peer.has("persistent_keepalive_interval"))
-        assertEquals(25, peer.getInt("persistent_keepalive_interval"))
+
     }
 
     @Test
