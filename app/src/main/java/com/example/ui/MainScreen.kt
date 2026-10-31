@@ -402,7 +402,7 @@ fun MainScreen(
                             modifier = Modifier.padding(vertical = 2.dp)
                         ) {
                             Text(
-                                text = "sing-box v1.11.0",
+                                text = "Engine integration pending",
                                 color = SkyBlueOnPrimaryContainer,
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.SemiBold,
