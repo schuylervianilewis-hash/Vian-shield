@@ -427,7 +427,7 @@ private fun VpnHealthStatusCard(
                         )
                         Text(
                             text = when (vpnState) {
-                                is VpnState.Connected -> "Encrypted UDP userspace tunnel active"
+                                is VpnState.Connected -> "VPN tunnel active"
                                 is VpnState.Error -> vpnState.message
                                 else -> "VPN engine not integrated"
                             },
