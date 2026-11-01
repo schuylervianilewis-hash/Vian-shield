@@ -429,7 +429,7 @@ private fun VpnHealthStatusCard(
                             text = when (vpnState) {
                                 is VpnState.Connected -> "Encrypted UDP userspace tunnel active"
                                 is VpnState.Error -> vpnState.message
-                                else -> "sing-box v1.11.0 ready"
+                                else -> "VPN engine not integrated"
                             },
                             fontSize = 11.sp,
                             color = SkyBlueTextSecondary
