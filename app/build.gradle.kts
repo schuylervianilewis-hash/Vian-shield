@@ -89,6 +89,12 @@ android {
       version = "3.22.1"
     }
   }
+  sourceSets {
+    getByName("main") {
+      // Package the Rust cdylib alongside the C JNI library for both ARM ABIs.
+      jniLibs.srcDir(rustJniLibsDir)
+    }
+  }
   dependenciesInfo {
     includeInApk = false
     includeInBundle = true
