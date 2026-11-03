@@ -18,6 +18,9 @@ import com.example.logging.LogExporter
 import com.example.vpn.VianshieldVpnService
 import com.example.vpn.VpnLifecycleController
 import com.example.vpn.VpnState
+import com.example.ui.AppFirewallRule
+import com.example.ui.AppFirewallRuleRepository
+import com.example.ui.FirewallMode
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -47,6 +50,9 @@ enum class TimeFilter(val label: String, val durationMs: Long?) {
 class DiagnosticViewModel(application: Application) : AndroidViewModel(application) {
 
     private val lifecycleController = VpnLifecycleController(application)
+    private val appFirewallRuleRepository = AppFirewallRuleRepository(application)
+
+    val appFirewallRules: StateFlow<Map<String, AppFirewallRule>> = appFirewallRuleRepository.rules
 
     val vpnState: StateFlow<VpnState> = VianshieldVpnService.vpnState
     val rawLogEvents = OperationalLogCatcher.events
@@ -176,6 +182,14 @@ class DiagnosticViewModel(application: Application) : AndroidViewModel(applicati
 
     fun toggleSortOrder() {
         _sortNewestFirst.value = !_sortNewestFirst.value
+    }
+
+    fun saveAppFirewallRule(rule: AppFirewallRule) {
+        appFirewallRuleRepository.save(rule)
+    }
+
+    fun saveAppFirewallRules(rules: Collection<AppFirewallRule>) {
+        appFirewallRuleRepository.saveAll(rules)
     }
 
     fun updateConfig(newConfig: String) {

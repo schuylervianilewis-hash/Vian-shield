@@ -9,6 +9,9 @@ import com.example.logging.LogExporter
 import com.example.logging.LogSeverity
 import com.example.logging.OperationalLogCatcher
 import com.example.ui.AppScreen
+import com.example.ui.AppFirewallRule
+import com.example.ui.AppFirewallRuleRepository
+import com.example.ui.FirewallMode
 import com.example.ui.DiagnosticViewModel
 import com.example.ui.TimeFilter
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -318,5 +321,43 @@ class VianshieldPhase1Test {
         assertEquals(0, viewModel.pendingCrashCount.value)
     }
 
+    @Test
+    fun appFirewallRuleRepository_persistsPerAppRules() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        context.getSharedPreferences("vianshield_firewall_rules_v1", Context.MODE_PRIVATE)
+            .edit().clear().commit()
+
+        val repository = AppFirewallRuleRepository(context)
+        val rule = AppFirewallRule(
+            packageName = "com.example.browser",
+            mode = FirewallMode.BLOCK,
+            speedException = "WiFi only",
+            screenAwareRule = true
+        )
+        repository.save(rule)
+
+        assertEquals(rule, repository.getRule("com.example.browser"))
+        assertEquals(rule, AppFirewallRuleRepository(context).getRule("com.example.browser"))
+    }
+
+    @Test
+    fun appFirewallRuleRepository_saveAllUpdatesRulesAtomicallyInState() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        context.getSharedPreferences("vianshield_firewall_rules_v1", Context.MODE_PRIVATE)
+            .edit().clear().commit()
+
+        val repository = AppFirewallRuleRepository(context)
+        val rules = listOf(
+            AppFirewallRule("com.example.one", FirewallMode.BLOCK),
+            AppFirewallRule("com.example.two", FirewallMode.DIRECT, "Default", true)
+        )
+
+        repository.saveAll(rules)
+
+        assertEquals(rules.size, repository.rules.value.size)
+        assertEquals(FirewallMode.BLOCK, repository.rules.value["com.example.one"]?.mode)
+        assertEquals(FirewallMode.DIRECT, repository.rules.value["com.example.two"]?.mode)
+        assertTrue(repository.rules.value["com.example.two"]?.screenAwareRule == true)
+    }
 
 }

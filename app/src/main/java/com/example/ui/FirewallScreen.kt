@@ -104,7 +104,7 @@ fun FirewallScreen(
     var showSystemApps by remember { mutableStateOf(false) }
     var expandedAppPackage by remember { mutableStateOf<String?>(null) }
 
-    // In-memory firewall rules map: packageName -> AppFirewallItem
+    // UI cache for installed apps; selected settings are persisted by the ViewModel.
     var appRules by remember {
         mutableStateOf<Map<String, AppFirewallItem>>(emptyMap())
     }
@@ -130,8 +130,10 @@ fun FirewallScreen(
                     packageName = appInfo.packageName,
                     appName = if (label.isNotBlank()) label else appInfo.packageName,
                     isSystemApp = isSystem,
-                    mode = FirewallMode.VPN,
-                    isConfigured = false
+                    mode = viewModel.appFirewallRules.value[appInfo.packageName]?.mode ?: FirewallMode.VPN,
+                    isConfigured = viewModel.appFirewallRules.value.containsKey(appInfo.packageName),
+                    speedException = viewModel.appFirewallRules.value[appInfo.packageName]?.speedException ?: "Default",
+                    screenAwareRule = viewModel.appFirewallRules.value[appInfo.packageName]?.screenAwareRule ?: false
                 )
             }
         } else {
@@ -326,6 +328,9 @@ fun FirewallScreen(
                                     updated[app.packageName] = app.copy(mode = FirewallMode.BLOCK, isConfigured = true)
                                 }
                                 appRules = updated
+                                viewModel.saveAppFirewallRules(displayedApps.map { app ->
+                                    app.copy(mode = FirewallMode.BLOCK, isConfigured = true).toPersistedRule()
+                                })
                             }
                         )
                         MasterModeChip(
@@ -337,6 +342,9 @@ fun FirewallScreen(
                                     updated[app.packageName] = app.copy(mode = FirewallMode.VPN, isConfigured = true)
                                 }
                                 appRules = updated
+                                viewModel.saveAppFirewallRules(displayedApps.map { app ->
+                                    app.copy(mode = FirewallMode.VPN, isConfigured = true).toPersistedRule()
+                                })
                             }
                         )
                         MasterModeChip(
@@ -348,6 +356,9 @@ fun FirewallScreen(
                                     updated[app.packageName] = app.copy(mode = FirewallMode.DIRECT, isConfigured = true)
                                 }
                                 appRules = updated
+                                viewModel.saveAppFirewallRules(displayedApps.map { app ->
+                                    app.copy(mode = FirewallMode.DIRECT, isConfigured = true).toPersistedRule()
+                                })
                             }
                         )
                     }
@@ -384,22 +395,19 @@ fun FirewallScreen(
                             expandedAppPackage = if (isExpanded) null else item.packageName
                         },
                         onModeSelected = { newMode ->
-                            appRules = appRules + (item.packageName to item.copy(
-                                mode = newMode,
-                                isConfigured = true
-                            ))
+                            val updated = item.copy(mode = newMode, isConfigured = true)
+                            appRules = appRules + (item.packageName to updated)
+                            viewModel.saveAppFirewallRule(updated.toPersistedRule())
                         },
                         onSpeedExceptionSelected = { exception ->
-                            appRules = appRules + (item.packageName to item.copy(
-                                speedException = exception,
-                                isConfigured = true
-                            ))
+                            val updated = item.copy(speedException = exception, isConfigured = true)
+                            appRules = appRules + (item.packageName to updated)
+                            viewModel.saveAppFirewallRule(updated.toPersistedRule())
                         },
                         onScreenAwareToggled = { enabled ->
-                            appRules = appRules + (item.packageName to item.copy(
-                                screenAwareRule = enabled,
-                                isConfigured = true
-                            ))
+                            val updated = item.copy(screenAwareRule = enabled, isConfigured = true)
+                            appRules = appRules + (item.packageName to updated)
+                            viewModel.saveAppFirewallRule(updated.toPersistedRule())
                         }
                     )
                 }
@@ -675,3 +683,11 @@ private fun MasterModeChip(
         )
     }
 }
+
+
+private fun AppFirewallItem.toPersistedRule(): AppFirewallRule = AppFirewallRule(
+    packageName = packageName,
+    mode = mode,
+    speedException = speedException,
+    screenAwareRule = screenAwareRule
+)
