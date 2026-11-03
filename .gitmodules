@@ -1,0 +1,3 @@
+[submodule "third_party/tracker-control"]
+	path = third_party/tracker-control
+	url = https://github.com/TrackerControl/tracker-control-android.git

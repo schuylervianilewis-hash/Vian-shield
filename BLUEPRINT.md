@@ -37,6 +37,14 @@ TrackerControl is an Android application rather than a ready-made Android librar
 - [x] Replace the native Sing-box CI build with the existing Gradle test/APK pipeline.
 - [x] Remove obsolete Sing-box-specific tests and retain parser/logging/ViewModel tests.
 
+### TrackerControl import bootstrap
+- [x] Confirm GPL-3.0 licensing and user approval for GPL-3.0 distribution.
+- [x] Pin upstream TrackerControl source as a Git submodule for reproducible source audit.
+- [x] Preserve upstream GPL-3.0 license text and add third-party attribution notes.
+- [x] Configure CI checkout to initialize the pinned submodule.
+- [ ] Audit native build, service, packet loop, data/storage, tracker datasets and all nested third-party licenses.
+- [ ] Extract and adapt the runtime behind Vianshield's existing single VPN service; do not compile a second VPN service.
+
 ### Remaining verification
 - [ ] Run the GitHub Actions unit-test and APK workflow on this branch.
 - [ ] Fix compilation/test issues revealed by CI.
@@ -48,7 +56,7 @@ TrackerControl is an Android application rather than a ready-made Android librar
 ## 4. Preserve Existing Vianshield Work
 
 Keep and adapt:
-- Four existing main UI tabs and the current Vianshield visual system.
+- The Vianshield visual system and five primary tabs: Main, Firewall, VPN, Tracker and Settings. Tracker currently remains a placeholder.
 - WireGuard .conf parsing, validation, redacted profile previews and import support.
 - Android VPN permission/lifecycle shell and foreground notification infrastructure.
 - Operational Log Catcher, Log Keeper, Crash Reporter and Log Exporter.
