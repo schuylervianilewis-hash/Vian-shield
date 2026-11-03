@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Settings
@@ -35,6 +36,7 @@ import com.example.ui.LogKeeperScreen
 import com.example.ui.MainScreen
 import com.example.ui.ProfilesScreen
 import com.example.ui.SettingsScreen
+import com.example.ui.TrackerScreen
 import com.example.ui.theme.MyApplicationTheme
 import com.example.ui.theme.SkyBluePrimary
 import com.example.ui.theme.SkyBluePrimaryContainer
@@ -63,6 +65,7 @@ class MainActivity : ComponentActivity() {
                     NavTabItem(AppScreen.MAIN, "Main", Icons.Default.Security, "bottom_nav_main"),
                     NavTabItem(AppScreen.FIREWALL, "Firewall", Icons.Default.Tune, "bottom_nav_firewall"),
                     NavTabItem(AppScreen.VPN, "VPN", Icons.Default.Lock, "bottom_nav_vpn"),
+                    NavTabItem(AppScreen.TRACKER, "Tracker", Icons.Default.BugReport, "bottom_nav_tracker"),
                     NavTabItem(AppScreen.SETTINGS, "Settings", Icons.Default.Settings, "bottom_nav_settings")
                 )
 
@@ -70,6 +73,7 @@ class MainActivity : ComponentActivity() {
                     AppScreen.MAIN,
                     AppScreen.FIREWALL,
                     AppScreen.VPN,
+                    AppScreen.TRACKER,
                     AppScreen.PROFILES,
                     AppScreen.SETTINGS
                 )
@@ -140,6 +144,9 @@ class MainActivity : ComponentActivity() {
                                         viewModel = diagnosticViewModel,
                                         onBack = { diagnosticViewModel.navigateTo(AppScreen.MAIN) }
                                     )
+                                }
+                                AppScreen.TRACKER -> {
+                                    TrackerScreen()
                                 }
                                 AppScreen.SETTINGS -> {
                                     SettingsScreen(
