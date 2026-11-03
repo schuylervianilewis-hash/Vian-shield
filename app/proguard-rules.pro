@@ -19,3 +19,11 @@
 # If you keep the line number information, uncomment this to
 # hide the original source file name.
 #-renamesourcefileattribute SourceFile
+
+
+# TrackerControl/NetGuard JNI calls these exact classes, members and signatures.
+-keep class eu.faircode.netguard.ServiceSinkhole { *; }
+-keep class eu.faircode.netguard.Packet { *; }
+-keep class eu.faircode.netguard.Allowed { *; }
+-keep class eu.faircode.netguard.ResourceRecord { *; }
+-keep class eu.faircode.netguard.Usage { *; }

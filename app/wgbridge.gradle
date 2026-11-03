@@ -1,0 +1,165 @@
+import org.gradle.process.ExecOperations
+
+// Build pinned TrackerControl's Rust cdylib. The C packet engine directly
+// depends on tcdns_* exported by libwgbridge, independently of VPN routing.
+def wgbridgeSrcDir = file("$rootDir/third_party/tracker-control/wgbridge-rs")
+def wgbridgeToolchainFile = file("$rootDir/third_party/tracker-control/rust-toolchain.toml")
+def wgbridgeOutDir = layout.buildDirectory.dir("rustJniLibs").get().asFile
+def wgbridgeAbis = ['armeabi-v7a', 'arm64-v8a']
+ext.wgbridgeNdkVersion = '29.0.14206865'
+def wgbridgeNdkVersion = ext.wgbridgeNdkVersion
+def wgbridgeCargoNdkVersion = '4.1.2'
+def wgbridgeExecOperations = project.services.get(ExecOperations)
+
+def findNdkDirectory = { ->
+    def sdkDir = null
+    def localProps = file("$rootDir/local.properties")
+    if (localProps.exists()) {
+        def props = new Properties()
+        localProps.withInputStream { props.load(it) }
+        sdkDir = props.getProperty('sdk.dir')
+    }
+    sdkDir = sdkDir ?: System.getenv('ANDROID_HOME') ?: System.getenv('ANDROID_SDK_ROOT')
+    if (sdkDir == null)
+        throw new GradleException('Cannot locate Android SDK (set sdk.dir or ANDROID_HOME).')
+    def ndkDir = file("$sdkDir/ndk/$wgbridgeNdkVersion")
+    if (!ndkDir.directory)
+        throw new GradleException("Android NDK $wgbridgeNdkVersion not found at $ndkDir.")
+    return ndkDir
+}
+
+def findCargoBinary = { ->
+    def home = System.getProperty('user.home')
+    def candidates = []
+    if (project.hasProperty('cargoBin')) candidates << project.property('cargoBin')
+    candidates += [
+        "$home/.cargo/bin/cargo",
+        '/opt/homebrew/opt/rustup/bin/cargo',
+        '/usr/local/opt/rustup/bin/cargo',
+        '/usr/local/bin/cargo',
+        '/usr/bin/cargo'
+    ]
+    for (candidate in candidates) {
+        if (candidate != null && file(candidate).canExecute()) return candidate
+    }
+    return 'cargo'
+}
+
+def resolveCargoTargetDir = { ->
+    if (project.hasProperty('cargoTargetDir')) return file(project.property('cargoTargetDir'))
+    def fromEnv = System.getenv('CARGO_TARGET_DIR')
+    if (fromEnv) return file(fromEnv)
+    return file("\${System.getProperty('user.home')}/.cargo/vianshield-wgbridge-target")
+}
+
+def buildCargoEnv = { ->
+    def cargoBin = findCargoBinary()
+    def onPath = System.getenv('PATH')?.split(File.pathSeparator)?.any {
+        file("$it/cargo").canExecute()
+    }
+    if ((cargoBin == 'cargo' && !onPath) || (cargoBin != 'cargo' && !file(cargoBin).canExecute()))
+        throw new GradleException("Rust cargo is missing. Install the pinned toolchain and cargo-ndk \${wgbridgeCargoNdkVersion}.")
+
+    def cargoDir = file(cargoBin).parent
+    def env = new HashMap<String, String>(System.getenv())
+    def pathEntries = []
+    if (cargoDir) pathEntries << cargoDir
+    pathEntries << "\${System.getProperty('user.home')}/.cargo/bin"
+    if (env['PATH']) pathEntries << env['PATH']
+    env['PATH'] = pathEntries.join(File.pathSeparator)
+    env['ANDROID_NDK_HOME'] = findNdkDirectory().absolutePath
+
+    def cargoTargetDir = resolveCargoTargetDir()
+    cargoTargetDir.mkdirs()
+    env['CARGO_TARGET_DIR'] = cargoTargetDir.absolutePath
+
+    def rustFlags = []
+    def separator = '\u001f'
+    if (env['CARGO_ENCODED_RUSTFLAGS']) {
+        rustFlags.addAll(env['CARGO_ENCODED_RUSTFLAGS'].split(separator).findAll { !it.isEmpty() })
+    } else if (env['RUSTFLAGS']) {
+        rustFlags.addAll(env['RUSTFLAGS'].trim().split(/\s+/))
+    }
+    def cargoHome = env['CARGO_HOME'] ?: "\${System.getProperty('user.home')}/.cargo"
+    rustFlags.addAll([
+        '-Clink-arg=-Wl,-z,max-page-size=16384',
+        '-Clink-arg=-Wl,-z,common-page-size=16384',
+        '-Clink-arg=-Wl,--build-id=none',
+        "--remap-path-prefix=\${file(cargoHome).absolutePath}=/cargo",
+        "--remap-path-prefix=\${wgbridgeSrcDir.absolutePath}=/wgbridge-rs"
+    ])
+    env['CARGO_ENCODED_RUSTFLAGS'] = rustFlags.join(separator)
+    env.remove('RUSTFLAGS')
+    return [cargoBin: cargoBin, env: env]
+}
+
+tasks.register('wgbridgeBuild') {
+    group = 'build'
+    description = 'Build pinned libwgbridge.so for armeabi-v7a and arm64-v8a.'
+    inputs.files(fileTree(wgbridgeSrcDir) {
+        include 'src/**', 'tc-dns/**', 'Cargo.toml', 'Cargo.lock'
+    }).withPropertyName('wgbridgeSource').withPathSensitivity(PathSensitivity.RELATIVE)
+    inputs.file(wgbridgeToolchainFile).withPropertyName('wgbridgeRustToolchain')
+    outputs.dir(wgbridgeOutDir).withPropertyName('wgbridgeJniLibs')
+
+    doLast {
+        def cargo = buildCargoEnv()
+        def env = cargo.env
+        def cargoNdk = file("\${System.getProperty('user.home')}/.cargo/bin/cargo-ndk")
+        if (!cargoNdk.canExecute() && !env['PATH'].split(File.pathSeparator).any { file("$it/cargo-ndk").canExecute() })
+            throw new GradleException("cargo-ndk \${wgbridgeCargoNdkVersion} missing. Install with cargo install cargo-ndk --version \${wgbridgeCargoNdkVersion} --locked.")
+
+        def args = [cargo.cargoBin, 'ndk']
+        wgbridgeAbis.each { args += ['-t', it] }
+        args += ['--platform', '23', '-o', wgbridgeOutDir.absolutePath,
+                 'build', '-p', 'wgbridge', '--release', '--locked', '--offline']
+
+        wgbridgeExecOperations.exec {
+            workingDir wgbridgeSrcDir
+            environment env
+            commandLine args
+            standardOutput = System.out
+            errorOutput = System.err
+        }.assertNormalExitValue()
+
+        def hostTag = {
+            def os = System.getProperty('os.name').toLowerCase()
+            if (os.contains('mac')) return 'darwin-x86_64'
+            if (os.contains('win')) return 'windows-x86_64'
+            return 'linux-x86_64'
+        }()
+        def ndk = findNdkDirectory().absolutePath
+        def objcopy = "$ndk/toolchains/llvm/prebuilt/$hostTag/bin/llvm-objcopy"
+        def nm = "$ndk/toolchains/llvm/prebuilt/$hostTag/bin/llvm-nm"
+
+        wgbridgeAbis.each { abi ->
+            fileTree(dir: "$wgbridgeOutDir/$abi", include: 'libgotatun*.so').each { it.delete() }
+            def lib = file("$wgbridgeOutDir/$abi/libwgbridge.so")
+            if (!lib.exists())
+                throw new GradleException("libwgbridge.so ($abi) was not produced by cargo-ndk.")
+
+            wgbridgeExecOperations.exec {
+                commandLine objcopy, '--remove-section', '.comment',
+                        '--remove-section', '.note.gnu.build-id', lib.absolutePath
+            }.assertNormalExitValue()
+
+            def symbolOutput = new ByteArrayOutputStream()
+            wgbridgeExecOperations.exec {
+                commandLine nm, '--defined-only', '--dynamic', lib.absolutePath
+                standardOutput = symbolOutput
+            }.assertNormalExitValue()
+            def symbols = symbolOutput.toString('UTF-8')
+            ['tcdns_process_response', 'tcdns_process_partial_response', 'tcdns_abi_version'].each { symbol ->
+                if (!symbols.contains(symbol))
+                    throw new GradleException("libwgbridge.so ($abi) is missing required symbol $symbol.")
+            }
+        }
+    }
+}
+
+tasks.configureEach { task ->
+    if (task.name ==~ /(configure|build)CMake.*/)
+        task.dependsOn 'wgbridgeBuild'
+    if (task.name ==~ /merge.*JniLibFolders/)
+        task.dependsOn 'wgbridgeBuild'
+}

@@ -26,6 +26,19 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
+      - name: Set up Android SDK and native build tools
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android NDK and CMake
+        run: sdkmanager --install "ndk;29.0.14206865" "cmake;3.22.1"
+
+      - name: Install pinned Rust toolchain and cargo-ndk
+        run: |
+          rustup toolchain install 1.95.0 --profile minimal
+          rustup target add --toolchain 1.95.0 aarch64-linux-android armv7-linux-androideabi i686-linux-android x86_64-linux-android
+          cargo +1.95.0 install cargo-ndk --version 4.1.2 --locked
+          cargo +1.95.0 fetch --manifest-path third_party/tracker-control/wgbridge-rs/Cargo.toml --locked
+
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
 
@@ -48,7 +61,11 @@ jobs:
           echo "APK generated successfully:"
           ls -lh dist/vianshield-dual-arm-debug.apk
           echo "Packaged native libraries (if any):"
-          unzip -l dist/vianshield-dual-arm-debug.apk "lib/*" || true
+          unzip -l dist/vianshield-dual-arm-debug.apk "lib/*"
+          for abi in armeabi-v7a arm64-v8a; do
+            unzip -l dist/vianshield-dual-arm-debug.apk "lib/$abi/libnetguard.so" | grep -q "libnetguard.so"
+            unzip -l dist/vianshield-dual-arm-debug.apk "lib/$abi/libwgbridge.so" | grep -q "libwgbridge.so"
+          done
 
       - name: Diagnostic listing on failure
         if: failure()

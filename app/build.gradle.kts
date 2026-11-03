@@ -6,8 +6,14 @@ plugins {
   // Google Services plugin disabled: Vianshield is a local VPN/firewall application and does not require Firebase
 }
 
+// Native packet engine build scripts are wired before Android CMake configuration.
+apply(from = "wgbridge.gradle")
+
+val rustJniLibsDir = layout.buildDirectory.dir("rustJniLibs").get().asFile.absolutePath
+
 android {
   namespace = "com.example"
+  ndkVersion = "29.0.14206865"
   compileSdk { version = release(36) { minorApiLevel = 1 } }
 
   defaultConfig {
@@ -22,6 +28,11 @@ android {
     // Dual-ARM architecture support: 32-bit ARM (armeabi-v7a) and 64-bit ARM (arm64-v8a)
     ndk {
       abiFilters.addAll(listOf("armeabi-v7a", "arm64-v8a"))
+    }
+    externalNativeBuild {
+      cmake {
+        arguments += listOf("-DWGBRIDGE_LIB_DIR=$rustJniLibsDir")
+      }
     }
   }
 
@@ -72,6 +83,12 @@ android {
     buildConfig = true
   }
   testOptions { unitTests { isIncludeAndroidResources = true } }
+  externalNativeBuild {
+    cmake {
+      path = file("CMakeLists.txt")
+      version = "3.22.1"
+    }
+  }
   dependenciesInfo {
     includeInApk = false
     includeInBundle = true
