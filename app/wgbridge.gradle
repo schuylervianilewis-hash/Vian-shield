@@ -10,6 +10,10 @@ ext.wgbridgeNdkVersion = '29.0.14206865'
 def wgbridgeNdkVersion = ext.wgbridgeNdkVersion
 def wgbridgeCargoNdkVersion = '4.1.2'
 def wgbridgeExecOperations = project.services.get(ExecOperations)
+// Resolve optional build overrides during configuration so task execution
+// closures do not retain the Gradle Project model.
+def cargoBinOverride = providers.gradleProperty('cargoBin').orNull
+def cargoTargetDirOverride = providers.gradleProperty('cargoTargetDir').map { file(it) }.orNull
 
 def findNdkDirectory = { ->
     def sdkDir = null
@@ -31,7 +35,7 @@ def findNdkDirectory = { ->
 def findCargoBinary = { ->
     def home = System.getProperty('user.home')
     def candidates = []
-    if (project.hasProperty('cargoBin')) candidates << project.property('cargoBin')
+    if (cargoBinOverride != null) candidates << cargoBinOverride
     candidates += [
         "$home/.cargo/bin/cargo",
         '/opt/homebrew/opt/rustup/bin/cargo',
@@ -46,7 +50,7 @@ def findCargoBinary = { ->
 }
 
 def resolveCargoTargetDir = { ->
-    if (project.hasProperty('cargoTargetDir')) return file(project.property('cargoTargetDir'))
+    if (cargoTargetDirOverride != null) return cargoTargetDirOverride
     def fromEnv = System.getenv('CARGO_TARGET_DIR')
     if (fromEnv) return file(fromEnv)
     return file("${System.getProperty('user.home')}/.cargo/vianshield-wgbridge-target")
