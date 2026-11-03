@@ -42,6 +42,8 @@ public final class ServiceSinkhole {
     private final Callbacks callbacks;
     private long nativeContext;
     private Thread tunnelThread;
+    private int logLevel = android.util.Log.WARN;
+    private boolean tcpMssClamp;
 
     public ServiceSinkhole(Callbacks callbacks) {
         this.callbacks = Objects.requireNonNull(callbacks, "callbacks");
@@ -61,7 +63,8 @@ public final class ServiceSinkhole {
 
         nativeContext = context;
         try {
-            jni_start(context, logLevel, tcpMssClamp);
+            this.logLevel = logLevel;
+            this.tcpMssClamp = tcpMssClamp;
         } catch (RuntimeException | Error failure) {
             nativeContext = 0;
             jni_done(context);
@@ -84,9 +87,11 @@ public final class ServiceSinkhole {
             // exits unexpectedly before starting a replacement loop.
             jni_clear(nativeContext);
             tunnelThread = null;
-            jni_start(nativeContext, android.util.Log.WARN, false);
         }
 
+        // Upstream calls jni_start before every jni_run, including recovery
+        // after a prior run has returned and its session list was cleared.
+        jni_start(nativeContext, logLevel, tcpMssClamp);
         final long context = nativeContext;
         Thread worker = new Thread(() -> {
             try {

@@ -49,7 +49,7 @@ def resolveCargoTargetDir = { ->
     if (project.hasProperty('cargoTargetDir')) return file(project.property('cargoTargetDir'))
     def fromEnv = System.getenv('CARGO_TARGET_DIR')
     if (fromEnv) return file(fromEnv)
-    return file("\${System.getProperty('user.home')}/.cargo/vianshield-wgbridge-target")
+    return file("${System.getProperty('user.home')}/.cargo/vianshield-wgbridge-target")
 }
 
 def buildCargoEnv = { ->
@@ -58,13 +58,13 @@ def buildCargoEnv = { ->
         file("$it/cargo").canExecute()
     }
     if ((cargoBin == 'cargo' && !onPath) || (cargoBin != 'cargo' && !file(cargoBin).canExecute()))
-        throw new GradleException("Rust cargo is missing. Install the pinned toolchain and cargo-ndk \${wgbridgeCargoNdkVersion}.")
+        throw new GradleException("Rust cargo is missing. Install the pinned toolchain and cargo-ndk ${wgbridgeCargoNdkVersion}.")
 
     def cargoDir = file(cargoBin).parent
     def env = new HashMap<String, String>(System.getenv())
     def pathEntries = []
     if (cargoDir) pathEntries << cargoDir
-    pathEntries << "\${System.getProperty('user.home')}/.cargo/bin"
+    pathEntries << "${System.getProperty('user.home')}/.cargo/bin"
     if (env['PATH']) pathEntries << env['PATH']
     env['PATH'] = pathEntries.join(File.pathSeparator)
     env['ANDROID_NDK_HOME'] = findNdkDirectory().absolutePath
@@ -80,13 +80,13 @@ def buildCargoEnv = { ->
     } else if (env['RUSTFLAGS']) {
         rustFlags.addAll(env['RUSTFLAGS'].trim().split(/\s+/))
     }
-    def cargoHome = env['CARGO_HOME'] ?: "\${System.getProperty('user.home')}/.cargo"
+    def cargoHome = env['CARGO_HOME'] ?: "${System.getProperty('user.home')}/.cargo"
     rustFlags.addAll([
         '-Clink-arg=-Wl,-z,max-page-size=16384',
         '-Clink-arg=-Wl,-z,common-page-size=16384',
         '-Clink-arg=-Wl,--build-id=none',
-        "--remap-path-prefix=\${file(cargoHome).absolutePath}=/cargo",
-        "--remap-path-prefix=\${wgbridgeSrcDir.absolutePath}=/wgbridge-rs"
+        "--remap-path-prefix=${file(cargoHome).absolutePath}=/cargo",
+        "--remap-path-prefix=${wgbridgeSrcDir.absolutePath}=/wgbridge-rs"
     ])
     env['CARGO_ENCODED_RUSTFLAGS'] = rustFlags.join(separator)
     env.remove('RUSTFLAGS')
@@ -105,9 +105,9 @@ tasks.register('wgbridgeBuild') {
     doLast {
         def cargo = buildCargoEnv()
         def env = cargo.env
-        def cargoNdk = file("\${System.getProperty('user.home')}/.cargo/bin/cargo-ndk")
+        def cargoNdk = file("${System.getProperty('user.home')}/.cargo/bin/cargo-ndk")
         if (!cargoNdk.canExecute() && !env['PATH'].split(File.pathSeparator).any { file("$it/cargo-ndk").canExecute() })
-            throw new GradleException("cargo-ndk \${wgbridgeCargoNdkVersion} missing. Install with cargo install cargo-ndk --version \${wgbridgeCargoNdkVersion} --locked.")
+            throw new GradleException("cargo-ndk ${wgbridgeCargoNdkVersion} missing. Install with cargo install cargo-ndk --version ${wgbridgeCargoNdkVersion} --locked.")
 
         def args = [cargo.cargoBin, 'ndk']
         wgbridgeAbis.each { args += ['-t', it] }
