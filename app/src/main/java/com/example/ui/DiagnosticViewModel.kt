@@ -30,6 +30,7 @@ enum class AppScreen {
     MAIN,
     FIREWALL,
     VPN,
+    TRACKER,
     PROFILES,
     SETTINGS,
     LOG_KEEPER,
@@ -152,10 +153,6 @@ class DiagnosticViewModel(application: Application) : AndroidViewModel(applicati
 
         if (newestFirst) filtered.reversed() else filtered
     }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
-
-    init {
-        OperationalLogCatcher.initialize(application)
-    }
 
     fun navigateTo(screen: AppScreen) {
         _currentScreen.value = screen
