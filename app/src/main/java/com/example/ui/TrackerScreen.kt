@@ -11,7 +11,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.BugReport
-import androidx.compose.material.icons.filled.Pending
+import androidx.compose.material.icons.filled.HourglassEmpty
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -28,7 +28,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.ui.theme.SkyBlueBackground
 import com.example.ui.theme.SkyBlueOnPrimaryContainer
-import com.example.ui.theme.SkyBluePrimaryContainer
 import com.example.ui.theme.SkyBlueSurface
 import com.example.ui.theme.SkyBlueSurfaceBorder
 import com.example.ui.theme.SkyBlueTextPrimary
@@ -105,7 +104,7 @@ fun TrackerScreen(modifier: Modifier = Modifier) {
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Icon(
-                    imageVector = Icons.Default.Pending,
+                    imageVector = Icons.Default.HourglassEmpty,
                     contentDescription = null,
                     tint = SkyBlueTextTertiary,
                     modifier = Modifier.size(18.dp)
