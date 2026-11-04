@@ -11,6 +11,8 @@ import com.example.logging.OperationalLogCatcher
 import com.example.ui.AppScreen
 import com.example.ui.AppFirewallRule
 import com.example.ui.AppFirewallRuleRepository
+import com.example.ui.FirewallSettingsRepository
+import com.example.ui.DnsResolverCatalog
 import com.example.ui.FirewallMode
 import com.example.ui.DiagnosticViewModel
 import com.example.ui.TimeFilter
@@ -426,6 +428,40 @@ class VianshieldPhase1Test {
             PacketPolicy.Decision.ALLOW_VPN,
             PacketPolicy.decide(12345, 99999, arrayOf("com.vpn.app"), rules)
         )
+    }
+
+    @Test
+    fun firewallSettings_persistDnsAndAdFilterPreferences() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        context.getSharedPreferences("vianshield_firewall_settings_v1", Context.MODE_PRIVATE)
+            .edit().clear().commit()
+
+        val repository = FirewallSettingsRepository(context)
+        assertEquals(DnsResolverCatalog.PROFILE_DEFAULT, repository.load().dnsProvider)
+        assertTrue(repository.saveDnsProvider(DnsResolverCatalog.QUAD9))
+        assertTrue(repository.saveAdFilterEnabled(true))
+        assertTrue(repository.saveSpeedPreset("Gaming / Low Latency"))
+
+        val restored = FirewallSettingsRepository(context).load()
+        assertEquals(DnsResolverCatalog.QUAD9, restored.dnsProvider)
+        assertTrue(restored.adFilterEnabled)
+        assertEquals("Gaming / Low Latency", restored.speedPreset)
+    }
+
+    @Test
+    fun firewallSettings_normalizesAndPersistsAllowlistDomains() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        context.getSharedPreferences("vianshield_firewall_settings_v1", Context.MODE_PRIVATE)
+            .edit().clear().commit()
+
+        val repository = FirewallSettingsRepository(context)
+        val added = repository.addAllowListDomain("  Example.COM.  ")
+        assertNotNull(added)
+        assertTrue(repository.isAllowlisted("api.example.com"))
+        assertTrue(repository.isAllowlisted("example.com"))
+        assertFalse(repository.isAllowlisted("notexample.com"))
+        assertEquals("example.com", repository.load().allowListDomains.last())
+        assertEquals(null, repository.addAllowListDomain("https://example.com/path"))
     }
 
 }

@@ -20,6 +20,8 @@ import com.example.config.WireGuardProfile
 import com.example.logging.LogCategory
 import com.example.logging.OperationalLogCatcher
 import com.example.ui.AppFirewallRuleRepository
+import com.example.ui.FirewallSettingsRepository
+import com.example.ui.DnsResolverCatalog
 import eu.faircode.netguard.ServiceSinkhole
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -73,12 +75,18 @@ class VianshieldVpnService : VpnService() {
         fun notifyFirewallRulesChanged() {
             activeInstance?.refreshFirewallRouting()
         }
+
+        /** Restart the single active TUN so Android's DNS server list is updated. */
+        fun notifyDnsSettingsChanged() {
+            activeInstance?.refreshDnsSettings()
+        }
     }
 
     private val lifecycleExecutor = Executors.newSingleThreadExecutor { task ->
         Thread(task, "Vianshield-VpnLifecycle").apply { isDaemon = true }
     }
     private val appFirewallRules by lazy { AppFirewallRuleRepository(applicationContext) }
+    private val firewallSettings by lazy { FirewallSettingsRepository(applicationContext) }
 
     @Volatile
     private var packetEngine: ServiceSinkhole? = null
@@ -308,14 +316,12 @@ class VianshieldVpnService : VpnService() {
         builder.addRoute(InetAddress.getByName("0.0.0.0"), 0)
         builder.addRoute(InetAddress.getByName("::"), 0)
 
-        val dnsServers = profile?.dnsServers.orEmpty()
-            .mapNotNull(::parseNumericAddress)
-            .ifEmpty {
-                listOf(
-                    InetAddress.getByName("1.1.1.1"),
-                    InetAddress.getByName("1.0.0.1")
-                )
-            }
+        val dnsServers = DnsResolverCatalog.resolve(
+            firewallSettings.load().dnsProvider,
+            profile?.dnsServers.orEmpty()
+        ).mapNotNull(::parseNumericAddress).ifEmpty {
+            listOf(InetAddress.getByName("1.1.1.1"), InetAddress.getByName("1.0.0.1"))
+        }
         dnsServers.distinctBy { it.hostAddress }.forEach(builder::addDnsServer)
 
         return builder.establish()
@@ -364,6 +370,20 @@ class VianshieldVpnService : VpnService() {
             if (!engine.isTunnelRunning()) return@execute
             appFirewallRules.reload()
             refreshFirewallRoutingNow(engine, activeWireGuard)
+        }
+    }
+
+    private fun refreshDnsSettings() {
+        val state = vpnState.value
+        if (state !is VpnState.Connected && state !is VpnState.Starting) return
+        lifecycleExecutor.execute {
+            if (packetEngine == null || tunDescriptor == null) return@execute
+            _vpnState.value = VpnState.Starting("Applying DNS provider")
+            val raw = activeRawConfig
+            val profile = activeProfile
+            val startId = activeStartId
+            stopRuntime()
+            startRuntime(raw, profile, startId)
         }
     }
 

@@ -52,6 +52,8 @@ class DiagnosticViewModel(application: Application) : AndroidViewModel(applicati
     private val lifecycleController = VpnLifecycleController(application)
     private val appFirewallRuleRepository = AppFirewallRuleRepository(application)
     private val wireGuardProfileRepository = WireGuardProfileRepository(application)
+    private val firewallSettingsRepository = FirewallSettingsRepository(application)
+    private val restoredFirewallSettings = firewallSettingsRepository.load()
     private val restoredProfileSnapshot = wireGuardProfileRepository.load()
     private var activeProfileId: String? = restoredProfileSnapshot.selectedProfileId
 
@@ -106,19 +108,19 @@ class DiagnosticViewModel(application: Application) : AndroidViewModel(applicati
     val pendingCrashCount: StateFlow<Int> = _pendingCrashCount.asStateFlow()
 
     // 1. Speed-throttling preset state
-    private val _speedPreset = MutableStateFlow("Unlimited (Full Speed)")
+    private val _speedPreset = MutableStateFlow(restoredFirewallSettings.speedPreset)
     val speedPreset: StateFlow<String> = _speedPreset.asStateFlow()
 
     // 2. DNS changer state
-    private val _dnsProvider = MutableStateFlow("Profile Default (from .conf)")
+    private val _dnsProvider = MutableStateFlow(restoredFirewallSettings.dnsProvider)
     val dnsProvider: StateFlow<String> = _dnsProvider.asStateFlow()
 
     // 3. Ad filter master switch
-    private val _isAdFilterEnabled = MutableStateFlow(false)
+    private val _isAdFilterEnabled = MutableStateFlow(restoredFirewallSettings.adFilterEnabled)
     val isAdFilterEnabled: StateFlow<Boolean> = _isAdFilterEnabled.asStateFlow()
 
     // 4. Ad-filter allow-list
-    private val _adFilterAllowList = MutableStateFlow(listOf("api.github.com", "android.googleapis.com"))
+    private val _adFilterAllowList = MutableStateFlow(restoredFirewallSettings.allowListDomains)
     val adFilterAllowList: StateFlow<List<String>> = _adFilterAllowList.asStateFlow()
 
     // 5. Saved WireGuard profiles list
@@ -390,6 +392,7 @@ class DiagnosticViewModel(application: Application) : AndroidViewModel(applicati
     }
 
     fun setSpeedPreset(preset: String) {
+        if (!firewallSettingsRepository.saveSpeedPreset(preset)) return
         _speedPreset.value = preset
         OperationalLogCatcher.info(
             LogCategory.CONFIG_VALIDATION,
@@ -399,7 +402,9 @@ class DiagnosticViewModel(application: Application) : AndroidViewModel(applicati
     }
 
     fun setDnsProvider(provider: String) {
+        if (!firewallSettingsRepository.saveDnsProvider(provider)) return
         _dnsProvider.value = provider
+        VianshieldVpnService.notifyDnsSettingsChanged()
         OperationalLogCatcher.info(
             LogCategory.CONFIG_VALIDATION,
             "DiagnosticViewModel",
@@ -408,6 +413,7 @@ class DiagnosticViewModel(application: Application) : AndroidViewModel(applicati
     }
 
     fun setAdFilterEnabled(enabled: Boolean) {
+        if (!firewallSettingsRepository.saveAdFilterEnabled(enabled)) return
         _isAdFilterEnabled.value = enabled
         OperationalLogCatcher.info(
             LogCategory.CONFIG_VALIDATION,
@@ -416,15 +422,16 @@ class DiagnosticViewModel(application: Application) : AndroidViewModel(applicati
         )
     }
 
-    fun addAllowListDomain(domain: String) {
-        val clean = domain.trim().lowercase()
-        if (clean.isNotBlank() && !_adFilterAllowList.value.contains(clean)) {
-            _adFilterAllowList.value = _adFilterAllowList.value + clean
-        }
+    fun addAllowListDomain(domain: String): Boolean {
+        val saved = firewallSettingsRepository.addAllowListDomain(domain) ?: return false
+        _adFilterAllowList.value = saved.allowListDomains
+        return true
     }
 
-    fun removeAllowListDomain(domain: String) {
-        _adFilterAllowList.value = _adFilterAllowList.value.filter { it != domain }
+    fun removeAllowListDomain(domain: String): Boolean {
+        val saved = firewallSettingsRepository.removeAllowListDomain(domain) ?: return false
+        _adFilterAllowList.value = saved.allowListDomains
+        return true
     }
 
     fun selectSavedProfile(item: SavedProfileItem): Boolean {
