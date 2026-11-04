@@ -67,67 +67,21 @@ import com.example.ui.theme.StatusStarting
 import com.example.ui.theme.StatusStopped
 import com.example.vpn.VpnState
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DiagnosticsScreen(
+fun DiagnosticsPanel(
     viewModel: DiagnosticViewModel,
-    onBack: () -> Unit,
-    onOpenLogKeeper: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
-    BackHandler { onBack() }
-
     val vpnState by viewModel.vpnState.collectAsState()
     val isNativeAvailable = false
 
-    Scaffold(
-        modifier = modifier.fillMaxSize(),
-        containerColor = SkyBlueBackground,
-        topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        text = "Diagnostics",
-                        fontWeight = FontWeight.Bold,
-                        color = SkyBlueTextPrimary
-                    )
-                },
-                navigationIcon = {
-                    IconButton(
-                        onClick = onBack,
-                        modifier = Modifier.testTag("diagnostics_back_button")
-                    ) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Back",
-                            tint = SkyBlueTextPrimary
-                        )
-                    }
-                },
-                actions = {
-                    IconButton(
-                        onClick = onOpenLogKeeper,
-                        modifier = Modifier.testTag("diagnostics_open_log_keeper_button")
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.ListAlt,
-                            contentDescription = "Open Log Keeper",
-                            tint = SkyBluePrimary
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = SkyBlueSurface)
-            )
-        }
-    ) { innerPadding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-                .verticalScroll(rememberScrollState())
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
             // Engine Core Status
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -244,43 +198,6 @@ fun DiagnosticsScreen(
                 }
             }
 
-            // Troubleshooting & Quick Actions
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(14.dp),
-                colors = CardDefaults.cardColors(containerColor = SkyBlueSurface),
-                border = androidx.compose.foundation.BorderStroke(1.dp, SkyBlueSurfaceBorder)
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text(
-                        text = "Troubleshooting & Logging",
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 15.sp,
-                        color = SkyBlueTextPrimary
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = "All engine lifecycle events, configuration transformations, socket protect calls, and TUN interactions are recorded in the bounded Log Keeper audit trail.",
-                        fontSize = 12.sp,
-                        color = SkyBlueTextSecondary
-                    )
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Button(
-                        onClick = onOpenLogKeeper,
-                        shape = RoundedCornerShape(10.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = SkyBluePrimary),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(44.dp)
-                            .testTag("open_log_keeper_from_diag_button")
-                    ) {
-                        Icon(imageVector = Icons.Default.ListAlt, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Open Full Log Keeper", fontWeight = FontWeight.SemiBold)
-                    }
-                }
-            }
-        }
     }
 }
 

@@ -1,8 +1,10 @@
 package com.example.ui
 
 import android.content.pm.ApplicationInfo
+import android.util.LruCache
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -20,6 +22,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Android
 import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.MoreVert
@@ -46,6 +49,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -53,6 +57,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
@@ -60,6 +67,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.graphics.drawable.toBitmap
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import com.example.ui.theme.SkyBlueBackground
 import com.example.ui.theme.SkyBlueOnPrimaryContainer
 import com.example.ui.theme.SkyBluePrimary
@@ -88,6 +98,18 @@ data class AppFirewallItem(
     val screenAwareRule: Boolean = false
 )
 
+private object AppIconBitmapCache {
+    private val cache = LruCache<String, ImageBitmap>(128)
+
+    @Synchronized
+    fun get(packageName: String): ImageBitmap? = cache.get(packageName)
+
+    @Synchronized
+    fun put(packageName: String, bitmap: ImageBitmap) {
+        cache.put(packageName, bitmap)
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FirewallScreen(
@@ -100,73 +122,58 @@ fun FirewallScreen(
     val context = LocalContext.current
     var searchQuery by remember { mutableStateOf("") }
     var isSearchVisible by remember { mutableStateOf(false) }
-    var showMenu by remember { mutableStateOf(false) }
     var showSystemApps by remember { mutableStateOf(false) }
     var expandedAppPackage by remember { mutableStateOf<String?>(null) }
+    var isLoadingApps by remember { mutableStateOf(true) }
+    var appLoadError by remember { mutableStateOf<String?>(null) }
 
     // UI cache for installed apps; selected settings are persisted by the ViewModel.
     var appRules by remember {
         mutableStateOf<Map<String, AppFirewallItem>>(emptyMap())
     }
 
-    // Load installed apps once
+    // Load the real installed-app inventory. Never substitute demo rows on failure.
     LaunchedEffect(Unit) {
-        val pm = context.packageManager
-        val installed = try {
-            pm.getInstalledApplications(0)
-        } catch (_: Exception) {
-            emptyList<ApplicationInfo>()
-        }
-
-        val items = if (installed.isNotEmpty()) {
-            installed.map { appInfo ->
-                val label = try {
+        isLoadingApps = true
+        appLoadError = null
+        try {
+            val pm = context.packageManager
+            val installed = withContext(Dispatchers.IO) {
+                pm.getInstalledApplications(0)
+            }
+            val rules = viewModel.appFirewallRules.value
+            val items = installed.map { appInfo ->
+                val label = runCatching {
                     pm.getApplicationLabel(appInfo).toString()
-                } catch (_: Exception) {
-                    appInfo.packageName
-                }
-                val isSystem = (appInfo.flags and ApplicationInfo.FLAG_SYSTEM) != 0
+                }.getOrDefault(appInfo.packageName)
+                val isSystem = (appInfo.flags and
+                    (ApplicationInfo.FLAG_SYSTEM or ApplicationInfo.FLAG_UPDATED_SYSTEM_APP)) != 0
+                val saved = rules[appInfo.packageName]
                 AppFirewallItem(
                     packageName = appInfo.packageName,
-                    appName = if (label.isNotBlank()) label else appInfo.packageName,
+                    appName = label.ifBlank { appInfo.packageName },
                     isSystemApp = isSystem,
-                    mode = viewModel.appFirewallRules.value[appInfo.packageName]?.mode ?: FirewallMode.VPN,
-                    isConfigured = viewModel.appFirewallRules.value.containsKey(appInfo.packageName),
-                    speedException = viewModel.appFirewallRules.value[appInfo.packageName]?.speedException ?: "Default",
-                    screenAwareRule = viewModel.appFirewallRules.value[appInfo.packageName]?.screenAwareRule ?: false
+                    mode = saved?.mode ?: FirewallMode.VPN,
+                    isConfigured = saved != null,
+                    speedException = saved?.speedException ?: "Default",
+                    screenAwareRule = saved?.screenAwareRule ?: false
                 )
             }
-        } else {
-            // Seed a representative list for testing or emulator environments
-            listOf(
-                AppFirewallItem("com.android.chrome", "Google Chrome", isSystemApp = false, mode = FirewallMode.VPN),
-                AppFirewallItem("org.mozilla.firefox", "Firefox Browser", isSystemApp = false, mode = FirewallMode.VPN),
-                AppFirewallItem("com.google.android.youtube", "YouTube", isSystemApp = false, mode = FirewallMode.VPN),
-                AppFirewallItem("com.spotify.music", "Spotify", isSystemApp = false, mode = FirewallMode.VPN),
-                AppFirewallItem("com.whatsapp", "WhatsApp", isSystemApp = false, mode = FirewallMode.VPN),
-                AppFirewallItem("com.twitter.android", "X (Twitter)", isSystemApp = false, mode = FirewallMode.VPN),
-                AppFirewallItem("com.google.android.gm", "Gmail", isSystemApp = true, mode = FirewallMode.VPN),
-                AppFirewallItem("com.google.android.apps.maps", "Google Maps", isSystemApp = true, mode = FirewallMode.VPN),
-                AppFirewallItem("com.android.settings", "System Settings", isSystemApp = true, mode = FirewallMode.DIRECT),
-                AppFirewallItem("com.android.vending", "Google Play Store", isSystemApp = true, mode = FirewallMode.VPN)
-            )
+            appRules = items.associateBy { it.packageName }
+        } catch (error: Exception) {
+            appLoadError = error.message ?: "Android could not return the installed-app inventory."
+        } finally {
+            isLoadingApps = false
         }
-
-        appRules = items.associateBy { it.packageName }
     }
 
-    // Filter and Sort:
-    // 1. Filter by system app toggle
-    // 2. Filter by search query
-    // 3. Sort: Configured items first, then alphabetical by App Name
+    // User and system applications are separate, exclusive views.
     val displayedApps = appRules.values
         .filter { item ->
-            if (!showSystemApps && item.isSystemApp) false
-            else {
-                if (searchQuery.isBlank()) true
-                else item.appName.contains(searchQuery, ignoreCase = true) ||
-                        item.packageName.contains(searchQuery, ignoreCase = true)
-            }
+            item.isSystemApp == showSystemApps &&
+                (searchQuery.isBlank() ||
+                    item.appName.contains(searchQuery, ignoreCase = true) ||
+                    item.packageName.contains(searchQuery, ignoreCase = true))
         }
         .sortedWith(
             compareByDescending<AppFirewallItem> { it.isConfigured }
@@ -207,34 +214,8 @@ fun FirewallScreen(
                     IconButton(onClick = { isSearchVisible = !isSearchVisible }) {
                         Icon(
                             imageVector = Icons.Default.Search,
-                            contentDescription = "Search",
+                            contentDescription = "Search applications",
                             tint = if (isSearchVisible || searchQuery.isNotEmpty()) SkyBluePrimary else SkyBlueTextPrimary
-                        )
-                    }
-                    IconButton(onClick = { showMenu = true }) {
-                        Icon(
-                            imageVector = Icons.Default.MoreVert,
-                            contentDescription = "More Options",
-                            tint = SkyBlueTextPrimary
-                        )
-                    }
-                    DropdownMenu(
-                        expanded = showMenu,
-                        onDismissRequest = { showMenu = false },
-                        containerColor = SkyBlueSurface
-                    ) {
-                        DropdownMenuItem(
-                            text = {
-                                Text(
-                                    text = if (showSystemApps) "Hide System Applications" else "Show System Applications",
-                                    color = SkyBlueTextPrimary,
-                                    fontSize = 13.sp
-                                )
-                            },
-                            onClick = {
-                                showSystemApps = !showSystemApps
-                                showMenu = false
-                            }
                         )
                     }
                 },
@@ -249,6 +230,26 @@ fun FirewallScreen(
                 .padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    AppCategoryChip(
+                        label = "User Apps (${appRules.values.count { !it.isSystemApp }})",
+                        selected = !showSystemApps,
+                        testTag = "firewall_user_apps_tab",
+                        onClick = { showSystemApps = false }
+                    )
+                    AppCategoryChip(
+                        label = "System Apps (${appRules.values.count { it.isSystemApp }})",
+                        selected = showSystemApps,
+                        testTag = "firewall_system_apps_tab",
+                        onClick = { showSystemApps = true }
+                    )
+                }
+            }
+
             // Search Bar (shown when toggled or non-empty)
             if (isSearchVisible || searchQuery.isNotEmpty()) {
                 item {
@@ -366,28 +367,43 @@ fun FirewallScreen(
             }
 
             // 3. List of Apps (Compact One-Line Rows)
-            if (displayedApps.isEmpty()) {
-                item {
+            when {
+                isLoadingApps -> item {
                     Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 32.dp),
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 32.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("Loading installed applications…", color = SkyBlueTextSecondary, fontSize = 13.sp)
+                    }
+                }
+                appLoadError != null -> item {
+                    Text(
+                        text = "Unable to load installed applications: ${appLoadError}",
+                        color = StatusError,
+                        fontSize = 13.sp,
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 24.dp)
+                    )
+                }
+                displayedApps.isEmpty() -> item {
+                    Box(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 32.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = if (searchQuery.isNotBlank()) "No applications found matching '$searchQuery'" else "Loading applications...",
+                            text = if (searchQuery.isNotBlank()) {
+                                "No applications found matching '${searchQuery}'"
+                            } else if (showSystemApps) {
+                                "No system applications are visible to Vianshield."
+                            } else {
+                                "No user applications are visible to Vianshield."
+                            },
                             color = SkyBlueTextSecondary,
                             fontSize = 13.sp
                         )
                     }
                 }
-            } else {
-                items(
-                    items = displayedApps,
-                    key = { it.packageName }
-                ) { item ->
+                else -> items(items = displayedApps, key = { it.packageName }) { item ->
                     val isExpanded = expandedAppPackage == item.packageName
-
                     AppFirewallRow(
                         item = item,
                         isExpanded = isExpanded,
@@ -412,7 +428,6 @@ fun FirewallScreen(
                     )
                 }
             }
-
             item {
                 Spacer(modifier = Modifier.height(16.dp))
             }
@@ -429,7 +444,8 @@ private fun AppFirewallRow(
     onSpeedExceptionSelected: (String) -> Unit,
     onScreenAwareToggled: (Boolean) -> Unit
 ) {
-    Card(
+
+    val context = LocalContext.current    Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(containerColor = SkyBlueSurface),
@@ -451,29 +467,47 @@ private fun AppFirewallRow(
                         .clickable(onClick = onToggleExpand),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
+                    val appIcon by produceState<ImageBitmap?>(
+                        initialValue = AppIconBitmapCache.get(item.packageName),
+                        key1 = item.packageName
+                    ) {
+                        if (value == null) {
+                            val loaded = withContext(Dispatchers.IO) {
+                                runCatching {
+                                    context.packageManager
+                                        .getApplicationIcon(item.packageName)
+                                        .toBitmap(width = 96, height = 96)
+                                        .asImageBitmap()
+                                }.getOrNull()
+                            }
+                            if (loaded != null) {
+                                AppIconBitmapCache.put(item.packageName, loaded)
+                                value = loaded
+                            }
+                        }
+                    }
                     Box(
                         modifier = Modifier
-                            .size(32.dp)
+                            .size(36.dp)
                             .clip(RoundedCornerShape(8.dp))
-                            .background(
-                                when (item.mode) {
-                                    FirewallMode.BLOCK -> Color(0xFFFEE2E2)
-                                    FirewallMode.VPN -> SkyBluePrimaryContainer
-                                    FirewallMode.DIRECT -> SkyBlueSurfaceVariant
-                                }
-                            ),
+                            .background(SkyBlueSurfaceVariant),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text(
-                            text = item.appName.firstOrNull()?.uppercase() ?: "A",
-                            fontWeight = FontWeight.Bold,
-                            color = when (item.mode) {
-                                FirewallMode.BLOCK -> StatusError
-                                FirewallMode.VPN -> SkyBlueOnPrimaryContainer
-                                FirewallMode.DIRECT -> SkyBlueTextSecondary
-                            },
-                            fontSize = 14.sp
-                        )
+                        if (appIcon != null) {
+                            Image(
+                                bitmap = appIcon!!,
+                                contentDescription = "${item.appName} icon",
+                                contentScale = ContentScale.Fit,
+                                modifier = Modifier.fillMaxSize().padding(2.dp)
+                            )
+                        } else {
+                            Icon(
+                                imageVector = Icons.Default.Android,
+                                contentDescription = "Application icon unavailable",
+                                tint = SkyBlueTextSecondary,
+                                modifier = Modifier.size(22.dp)
+                            )
+                        }
                     }
 
                     Spacer(modifier = Modifier.width(10.dp))
@@ -691,3 +725,31 @@ private fun AppFirewallItem.toPersistedRule(): AppFirewallRule = AppFirewallRule
     speedException = speedException,
     screenAwareRule = screenAwareRule
 )
+
+
+@Composable
+private fun AppCategoryChip(
+    label: String,
+    selected: Boolean,
+    testTag: String,
+    onClick: () -> Unit
+) {
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(10.dp),
+        color = if (selected) SkyBluePrimaryContainer else SkyBlueSurface,
+        border = androidx.compose.foundation.BorderStroke(
+            1.dp,
+            if (selected) SkyBluePrimary else SkyBlueSurfaceBorder
+        ),
+        modifier = Modifier.testTag(testTag)
+    ) {
+        Text(
+            text = label,
+            fontSize = 12.sp,
+            fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+            color = if (selected) SkyBlueOnPrimaryContainer else SkyBlueTextSecondary,
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+        )
+    }
+}

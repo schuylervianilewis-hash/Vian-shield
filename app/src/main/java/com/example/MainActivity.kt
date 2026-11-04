@@ -29,7 +29,6 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 import com.example.ui.AppScreen
-import com.example.ui.DiagnosticsScreen
 import com.example.ui.DiagnosticViewModel
 import com.example.ui.FirewallScreen
 import com.example.ui.LogKeeperScreen
@@ -152,8 +151,7 @@ class MainActivity : ComponentActivity() {
                                     SettingsScreen(
                                         viewModel = diagnosticViewModel,
                                         onBack = { diagnosticViewModel.navigateTo(AppScreen.MAIN) },
-                                        onOpenLogKeeper = { diagnosticViewModel.navigateTo(AppScreen.LOG_KEEPER) },
-                                        onOpenDiagnostics = { diagnosticViewModel.navigateTo(AppScreen.DIAGNOSTICS) }
+                                        onOpenLogKeeper = { diagnosticViewModel.navigateTo(AppScreen.LOG_KEEPER) }
                                     )
                                 }
                                 else -> {
@@ -165,17 +163,11 @@ class MainActivity : ComponentActivity() {
                 } else {
                     // Full-screen dedicated tools / sub-screens
                     when (currentScreen) {
-                        AppScreen.LOG_KEEPER -> {
+                        AppScreen.LOG_KEEPER, AppScreen.DIAGNOSTICS -> {
                             LogKeeperScreen(
                                 viewModel = diagnosticViewModel,
-                                onBack = { diagnosticViewModel.navigateTo(AppScreen.SETTINGS) }
-                            )
-                        }
-                        AppScreen.DIAGNOSTICS -> {
-                            DiagnosticsScreen(
-                                viewModel = diagnosticViewModel,
                                 onBack = { diagnosticViewModel.navigateTo(AppScreen.SETTINGS) },
-                                onOpenLogKeeper = { diagnosticViewModel.navigateTo(AppScreen.LOG_KEEPER) }
+                                initialDiagnostics = currentScreen == AppScreen.DIAGNOSTICS
                             )
                         }
                         else -> {

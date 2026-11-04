@@ -52,6 +52,9 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -78,6 +81,7 @@ import com.example.ui.theme.StatusStopped
 fun LogKeeperScreen(
     viewModel: DiagnosticViewModel,
     onBack: () -> Unit,
+    initialDiagnostics: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     BackHandler { onBack() }
@@ -95,6 +99,7 @@ fun LogKeeperScreen(
 
     val context = LocalContext.current
     val clipboardManager = LocalClipboardManager.current
+    var showDiagnostics by remember(initialDiagnostics) { mutableStateOf(initialDiagnostics) }
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
@@ -209,6 +214,30 @@ fun LogKeeperScreen(
                 .padding(innerPadding)
                 .padding(horizontal = 16.dp)
         ) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                FilterChip(
+                    selected = !showDiagnostics,
+                    onClick = { showDiagnostics = false },
+                    label = { Text("Logs") },
+                    modifier = Modifier.testTag("log_keeper_logs_tab")
+                )
+                FilterChip(
+                    selected = showDiagnostics,
+                    onClick = { showDiagnostics = true },
+                    label = { Text("Diagnostics") },
+                    modifier = Modifier.testTag("log_keeper_diagnostics_tab")
+                )
+            }
+            if (showDiagnostics) {
+                DiagnosticsPanel(
+                    viewModel = viewModel,
+                    modifier = Modifier.weight(1f).fillMaxWidth()
+                )
+            } else {
+                Column(modifier = Modifier.weight(1f).fillMaxWidth()) {
             Spacer(modifier = Modifier.height(8.dp))
 
             // Pending Crash Report Banner
@@ -493,6 +522,8 @@ fun LogKeeperScreen(
                     items(logEvents, key = { it.id }) { event ->
                         LogKeeperItemCard(event)
                     }
+                }
+            }
                 }
             }
         }
