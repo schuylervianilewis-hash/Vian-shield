@@ -149,54 +149,56 @@ fun LogKeeperScreen(
                         )
                     }
 
-                    // Export Logs to Downloads
-                    IconButton(
-                        onClick = {
-                            val res = viewModel.exportLogsToDownloads()
-                            if (res.isSuccess) {
-                                Toast.makeText(context, res.getOrThrow(), Toast.LENGTH_LONG).show()
-                            } else {
-                                Toast.makeText(context, "Export failed: ${res.exceptionOrNull()?.message}", Toast.LENGTH_SHORT).show()
-                            }
-                        },
-                        modifier = Modifier.testTag("export_logs_button")
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.FileDownload,
-                            contentDescription = stringResource(R.string.btn_export_logs),
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                    }
-
-                    // Copy to Clipboard
-                    IconButton(
-                        onClick = {
-                            val exported = viewModel.exportLogs()
-                            clipboardManager.setText(AnnotatedString(exported))
-                            Toast.makeText(context, context.getString(R.string.logs_copied_toast), Toast.LENGTH_SHORT).show()
-                        },
-                        modifier = Modifier.testTag("copy_logs_button")
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.ContentCopy,
-                            contentDescription = "Copy Logs",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-
-                    // Clear
-                    IconButton(
-                        onClick = {
-                            viewModel.clearLogs()
-                            Toast.makeText(context, "Logs cleared", Toast.LENGTH_SHORT).show()
-                        },
-                        modifier = Modifier.testTag("clear_logs_button")
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Delete,
-                            contentDescription = stringResource(R.string.btn_clear_logs),
-                            tint = MaterialTheme.colorScheme.error
-                        )
+                    if (!showDiagnostics) {
+                        // Export Logs to Downloads
+                        IconButton(
+                            onClick = {
+                                val res = viewModel.exportLogsToDownloads()
+                                if (res.isSuccess) {
+                                    Toast.makeText(context, res.getOrThrow(), Toast.LENGTH_LONG).show()
+                                } else {
+                                    Toast.makeText(context, "Export failed: ${res.exceptionOrNull()?.message}", Toast.LENGTH_SHORT).show()
+                                }
+                            },
+                            modifier = Modifier.testTag("export_logs_button")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.FileDownload,
+                                contentDescription = stringResource(R.string.btn_export_logs),
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
+    
+                        // Copy to Clipboard
+                        IconButton(
+                            onClick = {
+                                val exported = viewModel.exportLogs()
+                                clipboardManager.setText(AnnotatedString(exported))
+                                Toast.makeText(context, context.getString(R.string.logs_copied_toast), Toast.LENGTH_SHORT).show()
+                            },
+                            modifier = Modifier.testTag("copy_logs_button")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.ContentCopy,
+                                contentDescription = "Copy Logs",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+    
+                        // Clear
+                        IconButton(
+                            onClick = {
+                                viewModel.clearLogs()
+                                Toast.makeText(context, "Logs cleared", Toast.LENGTH_SHORT).show()
+                            },
+                            modifier = Modifier.testTag("clear_logs_button")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Delete,
+                                contentDescription = stringResource(R.string.btn_clear_logs),
+                                tint = MaterialTheme.colorScheme.error
+                            )
+                        }
                     }
                 },
                 colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
