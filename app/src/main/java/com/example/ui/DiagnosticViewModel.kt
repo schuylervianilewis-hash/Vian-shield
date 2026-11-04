@@ -250,6 +250,7 @@ class DiagnosticViewModel(application: Application) : AndroidViewModel(applicati
         activeProfileId = item.id
         _currentConfig.value = newConfig
         _importError.value = null
+        VianshieldVpnService.reconfigureIfRunning(getApplication(), newConfig)
         return true
     }
 
@@ -265,6 +266,7 @@ class DiagnosticViewModel(application: Application) : AndroidViewModel(applicati
         }
         activeProfileId = null
         _currentConfig.value = ""
+        VianshieldVpnService.reconfigureIfRunning(getApplication(), "")
         OperationalLogCatcher.info(
             LogCategory.CONFIG_VALIDATION,
             "DiagnosticViewModel",
@@ -380,6 +382,7 @@ class DiagnosticViewModel(application: Application) : AndroidViewModel(applicati
         _savedProfiles.value = updatedProfiles
         activeProfileId = newSavedItem.id
         _currentConfig.value = raw
+        VianshieldVpnService.reconfigureIfRunning(getApplication(), raw)
         OperationalLogCatcher.info(
             LogCategory.CONFIG_VALIDATION,
             "DiagnosticViewModel",
@@ -446,6 +449,7 @@ class DiagnosticViewModel(application: Application) : AndroidViewModel(applicati
         }
         activeProfileId = item.id
         _currentConfig.value = item.rawConfig
+        VianshieldVpnService.reconfigureIfRunning(getApplication(), item.rawConfig)
         OperationalLogCatcher.info(
             LogCategory.CONFIG_VALIDATION,
             "DiagnosticViewModel",

@@ -43,6 +43,7 @@ class VianshieldVpnService : VpnService() {
 
     companion object {
         const val ACTION_START_VPN = "com.example.vpn.ACTION_START_VPN"
+        const val ACTION_RECONFIGURE_VPN = "com.example.vpn.ACTION_RECONFIGURE_VPN"
         const val ACTION_STOP_VPN = "com.example.vpn.ACTION_STOP_VPN"
         const val EXTRA_CONFIG_STRING = "com.example.vpn.EXTRA_CONFIG_STRING"
 
@@ -65,6 +66,22 @@ class VianshieldVpnService : VpnService() {
                 action = ACTION_START_VPN
                 putExtra(EXTRA_CONFIG_STRING, configString)
             }
+
+        fun reconfigureIntent(context: Context, configString: String): Intent =
+            Intent(context, VianshieldVpnService::class.java).apply {
+                action = ACTION_RECONFIGURE_VPN
+                putExtra(EXTRA_CONFIG_STRING, configString)
+            }
+
+        /** Reconfigure the active TUN only when a runtime is already active or starting. */
+        fun reconfigureIfRunning(context: Context, configString: String) {
+            val state = vpnState.value
+            if (state !is VpnState.Connected && state !is VpnState.Starting) return
+            androidx.core.content.ContextCompat.startForegroundService(
+                context.applicationContext,
+                reconfigureIntent(context, configString)
+            )
+        }
 
         fun stopIntent(context: Context): Intent =
             Intent(context, VianshieldVpnService::class.java).apply {
@@ -144,6 +161,10 @@ class VianshieldVpnService : VpnService() {
                 intent.getStringExtra(EXTRA_CONFIG_STRING).orEmpty(),
                 startId
             )
+            ACTION_RECONFIGURE_VPN -> handleReconfigureRequest(
+                intent.getStringExtra(EXTRA_CONFIG_STRING).orEmpty(),
+                startId
+            )
             ACTION_STOP_VPN -> handleStopRequest(startId)
             else -> stopSelfResult(startId)
         }
@@ -189,6 +210,45 @@ class VianshieldVpnService : VpnService() {
             if (profile == null) "Initializing local firewall" else "Preparing WireGuard and firewall"
         )
         lifecycleExecutor.execute { startRuntime(rawConfig, profile, startId) }
+    }
+
+    private fun handleReconfigureRequest(rawConfig: String, startId: Int) {
+        val current = vpnState.value
+        if (current !is VpnState.Connected && current !is VpnState.Starting) {
+            stopSelfResult(startId)
+            return
+        }
+
+        val profile = if (rawConfig.isBlank()) null else {
+            val parsed = WireGuardConfigParser.parse(rawConfig)
+            if (parsed.isFailure) {
+                _vpnState.value = VpnState.Error(
+                    "ERR_CONFIG_INVALID",
+                    parsed.exceptionOrNull()?.message ?: "WireGuard profile validation failed"
+                )
+                lifecycleExecutor.execute {
+                    stopRuntime()
+                    stopForegroundSafely()
+                    stopSelfResult(startId)
+                }
+                return
+            }
+            parsed.getOrThrow()
+        }
+
+        activeRawConfig = rawConfig
+        activeProfile = profile
+        activeStartId = startId
+        _vpnState.value = VpnState.Starting(
+            if (profile == null) "Switching to local firewall" else "Applying WireGuard profile"
+        )
+        updateNotification(
+            if (profile == null) "Applying local firewall mode" else "Applying WireGuard profile"
+        )
+        lifecycleExecutor.execute {
+            if (vpnState.value is VpnState.Stopping) return@execute
+            startRuntime(rawConfig, profile, startId)
+        }
     }
 
     private fun startRuntime(rawConfig: String, profile: WireGuardProfile?, startId: Int) {

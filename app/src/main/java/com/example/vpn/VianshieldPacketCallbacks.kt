@@ -14,8 +14,8 @@ import com.example.ui.AppFirewallRuleRepository
 import java.net.InetSocketAddress
 
 /**
- * Minimal, fail-closed callbacks for the imported NetGuard native packet loop.
- * This is not activated until the TUN/service lifecycle is integrated.
+ * Callback adapter for the imported NetGuard native packet loop.
+ * VianshieldVpnService owns and starts the sole Android VPN/TUN runtime.
  */
 internal class VianshieldPacketCallbacks(
     private val service: VianshieldVpnService,
