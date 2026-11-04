@@ -630,6 +630,12 @@ private fun AppFirewallRow(
                         }
                     }
 
+                    Text(
+                        text = "Saved preference only · traffic shaping is not active yet",
+                        fontSize = 9.sp,
+                        color = SkyBlueTextTertiary
+                    )
+
                     Spacer(modifier = Modifier.height(6.dp))
 
                     Row(
@@ -645,7 +651,7 @@ private fun AppFirewallRow(
                                 color = SkyBlueTextPrimary
                             )
                             Text(
-                                text = "Block traffic when screen turns off",
+                                text = "Saved only · screen-state enforcement is not active yet",
                                 fontSize = 9.sp,
                                 color = SkyBlueTextSecondary
                             )

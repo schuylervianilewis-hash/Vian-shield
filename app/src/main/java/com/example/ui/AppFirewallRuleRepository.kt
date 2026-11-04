@@ -8,8 +8,9 @@ import kotlinx.coroutines.flow.asStateFlow
 /**
  * Persisted per-application firewall preferences.
  *
- * This is a settings store only; it does not itself enforce network policy.
- * The VPN engine must consume these rules before they can protect traffic.
+ * BLOCK/VPN/DIRECT are consumed by PacketPolicy and the native UID route table.
+ * Speed-exception and screen-aware values are persisted for the next enforcement
+ * layer and are not active traffic controls yet.
  */
 data class AppFirewallRule(
     val packageName: String,
