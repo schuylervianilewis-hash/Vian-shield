@@ -70,19 +70,13 @@ internal class VianshieldPacketCallbacks(
     override fun isDomainBlocked(domain: String): Boolean = false
 
     override fun logPacket(packet: Packet) {
-        OperationalLogCatcher.info(
-            LogCategory.VPN_LIFECYCLE,
-            "PacketPolicy",
-            "Packet decision: uid=${packet.uid}, allowed=${packet.allowed}, protocol=${packet.protocol}, destination=${packet.daddr}:${packet.dport}"
-        )
+        // Intentionally do not persist per-packet metadata. Destination IPs,
+        // ports and per-app activity are sensitive browsing telemetry.
     }
 
     override fun dnsResolved(record: ResourceRecord) {
-        OperationalLogCatcher.info(
-            LogCategory.VPN_LIFECYCLE,
-            "PacketPolicy",
-            "DNS response observed for ${record.QName}"
-        )
+        // Intentionally do not persist queried domains or resolved records.
+        // DNS counters can be aggregated without retaining domain history.
     }
 
     override fun accountUsage(usage: Usage) {
