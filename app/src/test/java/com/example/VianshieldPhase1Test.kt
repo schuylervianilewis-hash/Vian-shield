@@ -464,4 +464,29 @@ class VianshieldPhase1Test {
         assertEquals(null, repository.addAllowListDomain("https://example.com/path"))
     }
 
+    @Test
+    fun packetPolicy_allowsUnownedSystemUidsButDeniesUnknownAppRangeUids() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        context.getSharedPreferences("vianshield_firewall_rules_v1", Context.MODE_PRIVATE)
+            .edit().clear().commit()
+        val rules = AppFirewallRuleRepository(context)
+
+        assertEquals(
+            PacketPolicy.Decision.ALLOW_SYSTEM,
+            PacketPolicy.decide(1000, 99999, null, rules)
+        )
+        assertEquals(
+            PacketPolicy.Decision.ALLOW_SYSTEM,
+            PacketPolicy.decide(1001, 99999, emptyArray(), rules)
+        )
+        assertEquals(
+            PacketPolicy.Decision.UNKNOWN_UID,
+            PacketPolicy.decide(12345, 99999, null, rules)
+        )
+        assertEquals(
+            PacketPolicy.Decision.UNKNOWN_UID,
+            PacketPolicy.decide(-1, 99999, null, rules)
+        )
+    }
+
 }

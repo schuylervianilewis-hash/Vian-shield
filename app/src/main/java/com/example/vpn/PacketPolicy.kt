@@ -12,7 +12,7 @@ import com.example.ui.FirewallMode
  * Unknown UID attribution remains fail-closed.
  */
 internal object PacketPolicy {
-    enum class Decision { ALLOW_VPN, ALLOW_DIRECT, BLOCK, UNKNOWN_UID, SELF }
+    enum class Decision { ALLOW_VPN, ALLOW_DIRECT, ALLOW_SYSTEM, BLOCK, UNKNOWN_UID, SELF }
 
     fun decide(
         uid: Int,
@@ -21,7 +21,12 @@ internal object PacketPolicy {
         rules: AppFirewallRuleRepository
     ): Decision {
         if (uid == ownUid) return Decision.SELF
-        if (uid < 0 || packageNames.isNullOrEmpty()) return Decision.UNKNOWN_UID
+        if (uid < 0) return Decision.UNKNOWN_UID
+        // Match TrackerControl's safe system-daemon fallback: an unowned
+        // system UID (< 2000) is allowed, while unknown app-range UIDs fail closed.
+        if (packageNames.isNullOrEmpty()) {
+            return if (uid < 2000) Decision.ALLOW_SYSTEM else Decision.UNKNOWN_UID
+        }
 
         val appRules = packageNames.mapNotNull(rules::getRule)
         if (appRules.any { it.mode == FirewallMode.BLOCK }) return Decision.BLOCK

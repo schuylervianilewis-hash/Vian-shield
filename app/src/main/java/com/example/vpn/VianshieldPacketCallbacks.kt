@@ -55,6 +55,7 @@ internal class VianshieldPacketCallbacks(
         return when (PacketPolicy.decide(packet.uid, Process.myUid(), packages, rules)) {
             PacketPolicy.Decision.ALLOW_VPN,
             PacketPolicy.Decision.ALLOW_DIRECT,
+            PacketPolicy.Decision.ALLOW_SYSTEM,
             PacketPolicy.Decision.SELF -> {
                 packet.allowed = true
                 Allowed()
