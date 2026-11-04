@@ -59,6 +59,13 @@ class AppFirewallRuleRepository(context: Context) {
 
     fun getRule(packageName: String): AppFirewallRule? = _rules.value[packageName]
 
+    /** Refresh the live policy snapshot after another repository instance saved rules. */
+    fun reload() {
+        synchronized(lock) {
+            _rules.value = loadRules()
+        }
+    }
+
     private fun loadRules(): Map<String, AppFirewallRule> {
         val packageNames = preferences.all.keys
             .filter { it.startsWith(RULE_PREFIX) && it.endsWith(MODE_SUFFIX) }

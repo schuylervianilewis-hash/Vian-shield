@@ -204,10 +204,12 @@ class DiagnosticViewModel(application: Application) : AndroidViewModel(applicati
 
     fun saveAppFirewallRule(rule: AppFirewallRule) {
         appFirewallRuleRepository.save(rule)
+        VianshieldVpnService.notifyFirewallRulesChanged()
     }
 
     fun saveAppFirewallRules(rules: Collection<AppFirewallRule>) {
         appFirewallRuleRepository.saveAll(rules)
+        VianshieldVpnService.notifyFirewallRulesChanged()
     }
 
     fun updateConfig(newConfig: String): Boolean {
