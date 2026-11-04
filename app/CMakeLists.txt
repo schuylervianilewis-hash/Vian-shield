@@ -19,9 +19,77 @@ endif()
 
 add_compile_options("-ffile-prefix-map=${NETGUARD_SOURCE_DIR}=.")
 
+# Vianshield policy-refresh shim for the pinned TrackerControl packet engine.
+# A route-table update must also re-check existing TCP/UDP sessions; otherwise
+# a connection allowed before the user presses Block can keep using its cached
+# per-session decision. This patch is intentionally anchored to the pinned
+# upstream source and fails the native build if the expected code moves.
+set(NETGUARD_SESSION_SOURCE "${NETGUARD_SOURCE_DIR}/session.c")
+file(READ "${NETGUARD_SESSION_SOURCE}" VIAN_SESSION_SOURCE)
+set(VIAN_SESSION_INCLUDE_ANCHOR [=[#include "netguard.h"]=])
+string(FIND "${VIAN_SESSION_SOURCE}" "${VIAN_SESSION_INCLUDE_ANCHOR}" VIAN_SESSION_INCLUDE_POSITION)
+if(VIAN_SESSION_INCLUDE_POSITION EQUAL -1)
+    message(FATAL_ERROR "TrackerControl session.c changed: missing policy refresh include anchor")
+endif()
+set(VIAN_SESSION_INCLUDE_REPLACEMENT [=[#include "netguard.h"
+#include <stdatomic.h>
+
+static _Atomic int vianshield_policy_refresh_pending = 0;
+
+void request_policy_refresh(void) {
+    atomic_store_explicit(&vianshield_policy_refresh_pending, 1, memory_order_release);
+}
+
+static int take_policy_refresh(void) {
+    return atomic_exchange_explicit(&vianshield_policy_refresh_pending, 0, memory_order_acq_rel);
+}
+]=])
+string(REPLACE "${VIAN_SESSION_INCLUDE_ANCHOR}" "${VIAN_SESSION_INCLUDE_REPLACEMENT}"
+       VIAN_SESSION_SOURCE "${VIAN_SESSION_SOURCE}")
+
+set(VIAN_SESSION_REFRESH_ANCHOR [=[            time_t now = time(NULL);]=])
+string(FIND "${VIAN_SESSION_SOURCE}" "${VIAN_SESSION_REFRESH_ANCHOR}" VIAN_SESSION_REFRESH_POSITION)
+if(VIAN_SESSION_REFRESH_POSITION EQUAL -1)
+    message(FATAL_ERROR "TrackerControl session.c changed: missing session-policy refresh point")
+endif()
+set(VIAN_SESSION_REFRESH_REPLACEMENT [=[            // Run on the packet-loop thread while ctx->lock is held.
+            // This rechecks existing sessions against the latest per-app rules.
+            if (take_policy_refresh())
+                check_allowed(args);
+
+            time_t now = time(NULL);]=])
+string(REPLACE "${VIAN_SESSION_REFRESH_ANCHOR}" "${VIAN_SESSION_REFRESH_REPLACEMENT}"
+       VIAN_SESSION_SOURCE "${VIAN_SESSION_SOURCE}")
+set(VIAN_PATCHED_SESSION_SOURCE "${CMAKE_CURRENT_BINARY_DIR}/vianshield_session.c")
+file(WRITE "${VIAN_PATCHED_SESSION_SOURCE}" "${VIAN_SESSION_SOURCE}")
+
+set(NETGUARD_CORE_SOURCE "${NETGUARD_SOURCE_DIR}/netguard.c")
+file(READ "${NETGUARD_CORE_SOURCE}" VIAN_NETGUARD_SOURCE)
+set(VIAN_NETGUARD_INCLUDE_ANCHOR [=[#include "netguard.h"]=])
+string(FIND "${VIAN_NETGUARD_SOURCE}" "${VIAN_NETGUARD_INCLUDE_ANCHOR}" VIAN_NETGUARD_INCLUDE_POSITION)
+if(VIAN_NETGUARD_INCLUDE_POSITION EQUAL -1)
+    message(FATAL_ERROR "TrackerControl netguard.c changed: missing policy refresh declaration anchor")
+endif()
+set(VIAN_NETGUARD_INCLUDE_REPLACEMENT [=[#include "netguard.h"
+void request_policy_refresh(void);]=])
+string(REPLACE "${VIAN_NETGUARD_INCLUDE_ANCHOR}" "${VIAN_NETGUARD_INCLUDE_REPLACEMENT}"
+       VIAN_NETGUARD_SOURCE "${VIAN_NETGUARD_SOURCE}")
+
+set(VIAN_ROUTE_UPDATE_ANCHOR [=[    set_route_uids(uids, count, default_tunnel ? 1 : 0, dns_direct ? 1 : 0);]=])
+string(FIND "${VIAN_NETGUARD_SOURCE}" "${VIAN_ROUTE_UPDATE_ANCHOR}" VIAN_ROUTE_UPDATE_POSITION)
+if(VIAN_ROUTE_UPDATE_POSITION EQUAL -1)
+    message(FATAL_ERROR "TrackerControl netguard.c changed: missing native route update anchor")
+endif()
+set(VIAN_ROUTE_UPDATE_REPLACEMENT [=[    set_route_uids(uids, count, default_tunnel ? 1 : 0, dns_direct ? 1 : 0);
+    request_policy_refresh();]=])
+string(REPLACE "${VIAN_ROUTE_UPDATE_ANCHOR}" "${VIAN_ROUTE_UPDATE_REPLACEMENT}"
+       VIAN_NETGUARD_SOURCE "${VIAN_NETGUARD_SOURCE}")
+set(VIAN_PATCHED_NETGUARD_SOURCE "${CMAKE_CURRENT_BINARY_DIR}/vianshield_netguard.c")
+file(WRITE "${VIAN_PATCHED_NETGUARD_SOURCE}" "${VIAN_NETGUARD_SOURCE}")
+
 add_library(netguard SHARED
-    "${NETGUARD_SOURCE_DIR}/netguard.c"
-    "${NETGUARD_SOURCE_DIR}/session.c"
+    "${VIAN_PATCHED_NETGUARD_SOURCE}"
+    "${VIAN_PATCHED_SESSION_SOURCE}"
     "${NETGUARD_SOURCE_DIR}/ip.c"
     "${NETGUARD_SOURCE_DIR}/ip6_ext.c"
     "${NETGUARD_SOURCE_DIR}/policy.c"
