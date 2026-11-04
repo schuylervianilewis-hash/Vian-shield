@@ -53,13 +53,14 @@ internal class VianshieldPacketCallbacks(
             null
         }
         return when (PacketPolicy.decide(packet.uid, Process.myUid(), packages, rules)) {
-            PacketPolicy.Decision.ALLOW_VPN, PacketPolicy.Decision.SELF -> {
+            PacketPolicy.Decision.ALLOW_VPN,
+            PacketPolicy.Decision.ALLOW_DIRECT,
+            PacketPolicy.Decision.SELF -> {
                 packet.allowed = true
                 Allowed()
             }
             PacketPolicy.Decision.BLOCK,
-            PacketPolicy.Decision.UNKNOWN_UID,
-            PacketPolicy.Decision.DIRECT_NOT_READY -> {
+            PacketPolicy.Decision.UNKNOWN_UID -> {
                 packet.allowed = false
                 null
             }
@@ -94,6 +95,7 @@ internal class VianshieldPacketCallbacks(
             "PacketPolicy",
             "Native packet loop exited ($error): $reason"
         )
+        service.onNativePacketFailure(error, reason)
     }
 
     override fun onNativeError(error: Int, message: String) {
@@ -102,5 +104,6 @@ internal class VianshieldPacketCallbacks(
             "PacketPolicy",
             "Native packet engine error ($error): $message"
         )
+        service.onNativePacketFailure(error, message)
     }
 }

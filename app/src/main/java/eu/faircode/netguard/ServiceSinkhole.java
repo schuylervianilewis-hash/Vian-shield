@@ -165,6 +165,43 @@ public final class ServiceSinkhole {
         return jni_get_mtu();
     }
 
+    public synchronized boolean isTunnelRunning() {
+        return tunnelThread != null && tunnelThread.isAlive();
+    }
+
+    public synchronized int startWireGuardSocketpair() {
+        if (nativeContext == 0)
+            throw new IllegalStateException("Native packet engine is not initialized");
+        return jni_wireguard_start();
+    }
+
+    public synchronized void stopWireGuardSocketpair() {
+        if (nativeContext != 0)
+            jni_wireguard_stop();
+    }
+
+    public synchronized void setWireGuardRequired(boolean required) {
+        if (nativeContext == 0)
+            throw new IllegalStateException("Native packet engine is not initialized");
+        jni_wireguard_required(required);
+    }
+
+    public synchronized void setWireGuardRoute(int[] overrideUids, boolean defaultTunnel, boolean dnsDirect) {
+        if (nativeContext == 0)
+            throw new IllegalStateException("Native packet engine is not initialized");
+        jni_wireguard_route(overrideUids, defaultTunnel, dnsDirect);
+    }
+
+    public void wireGuardDnsResolved(String qname, String aname, String resource, int ttl) {
+        ResourceRecord record = new ResourceRecord();
+        record.Time = System.currentTimeMillis();
+        record.QName = qname;
+        record.AName = aname;
+        record.Resource = resource;
+        record.TTL = ttl;
+        callbacks.dnsResolved(record);
+    }
+
     public void setSniEnabled(boolean enabled) {
         jni_sni(enabled);
     }

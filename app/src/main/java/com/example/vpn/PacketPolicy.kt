@@ -4,14 +4,15 @@ import com.example.ui.AppFirewallRuleRepository
 import com.example.ui.FirewallMode
 
 /**
- * Conservative packet policy for the TrackerControl JNI callback.
+ * Packet allow/block policy for the native callback.
  *
- * Unknown UIDs and unsupported routing modes are denied rather than silently
- * inheriting an allow rule. DIRECT is intentionally denied until a protected
- * direct-egress route is implemented by the runtime.
+ * Known applications are allowed through the local firewall by default.
+ * BLOCK is enforced before per-UID routing. DIRECT is only selected for a
+ * shared UID when every package attached to that UID explicitly requests it.
+ * Unknown UID attribution remains fail-closed.
  */
 internal object PacketPolicy {
-    enum class Decision { ALLOW_VPN, BLOCK, UNKNOWN_UID, DIRECT_NOT_READY, SELF }
+    enum class Decision { ALLOW_VPN, ALLOW_DIRECT, BLOCK, UNKNOWN_UID, SELF }
 
     fun decide(
         uid: Int,
@@ -24,7 +25,13 @@ internal object PacketPolicy {
 
         val appRules = packageNames.mapNotNull(rules::getRule)
         if (appRules.any { it.mode == FirewallMode.BLOCK }) return Decision.BLOCK
-        if (appRules.any { it.mode == FirewallMode.DIRECT }) return Decision.DIRECT_NOT_READY
-        return if (appRules.isNotEmpty()) Decision.ALLOW_VPN else Decision.UNKNOWN_UID
+
+        val everyPackageExplicitlyDirect = appRules.isNotEmpty() &&
+            packageNames.all { packageName ->
+                rules.getRule(packageName)?.mode == FirewallMode.DIRECT
+            }
+        if (everyPackageExplicitlyDirect) return Decision.ALLOW_DIRECT
+
+        return Decision.ALLOW_VPN
     }
 }
