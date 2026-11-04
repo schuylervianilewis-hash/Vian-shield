@@ -6,24 +6,37 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.net.ConnectivityManager
+import android.net.Network
 import android.net.VpnService
 import android.os.Build
+import android.os.ParcelFileDescriptor
+import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.example.MainActivity
 import com.example.R
 import com.example.config.WireGuardConfigParser
+import com.example.config.WireGuardProfile
 import com.example.logging.LogCategory
 import com.example.logging.OperationalLogCatcher
+import com.example.ui.AppFirewallRuleRepository
+import com.example.ui.FirewallMode
+import eu.faircode.netguard.ServiceSinkhole
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import net.kollnig.missioncontrol.wg.WgEgress
+import java.net.Inet4Address
+import java.net.Inet6Address
+import java.net.InetAddress
+import java.util.concurrent.Executors
 
 /**
- * Android VPN service host.
+ * Sole owner of Vianshield's Android VPN TUN and packet-engine lifecycle.
  *
- * The Android service/lifecycle shell is intentionally engine-neutral. Until the
- * TrackerControl runtime is integrated, start requests fail closed and never
- * establish a TUN or report the VPN as connected.
+ * ServiceSinkhole is a plain JNI compatibility facade, not an Android
+ * Service. WgEgress owns the optional userspace WireGuard tunnel behind this
+ * same TUN. A blank profile starts local firewall-only protection.
  */
 class VianshieldVpnService : VpnService() {
 
@@ -34,9 +47,17 @@ class VianshieldVpnService : VpnService() {
 
         private const val NOTIFICATION_CHANNEL_ID = "vianshield_vpn_channel"
         private const val NOTIFICATION_ID = 1001
+        private const val FIREWALL_ONLY_ENDPOINT = "Local firewall"
+        private const val DEFAULT_FIREWALL_MTU = 1500
 
         private val _vpnState = MutableStateFlow<VpnState>(VpnState.Stopped)
         val vpnState: StateFlow<VpnState> = _vpnState.asStateFlow()
+
+        private val _nativeEngineAvailable = MutableStateFlow(false)
+        val nativeEngineAvailable: StateFlow<Boolean> = _nativeEngineAvailable.asStateFlow()
+
+        @Volatile
+        private var activeInstance: VianshieldVpnService? = null
 
         fun startIntent(context: Context, configString: String): Intent =
             Intent(context, VianshieldVpnService::class.java).apply {
@@ -48,15 +69,65 @@ class VianshieldVpnService : VpnService() {
             Intent(context, VianshieldVpnService::class.java).apply {
                 action = ACTION_STOP_VPN
             }
+
+        /** Refresh native per-UID routing after the UI persists firewall rules. */
+        fun notifyFirewallRulesChanged() {
+            activeInstance?.refreshFirewallRouting()
+        }
+    }
+
+    private val lifecycleExecutor = Executors.newSingleThreadExecutor { task ->
+        Thread(task, "Vianshield-VpnLifecycle").apply { isDaemon = true }
+    }
+    private val appFirewallRules by lazy { AppFirewallRuleRepository(applicationContext) }
+
+    @Volatile
+    private var packetEngine: ServiceSinkhole? = null
+
+    @Volatile
+    private var tunDescriptor: ParcelFileDescriptor? = null
+
+    @Volatile
+    private var activeRawConfig: String = ""
+
+    @Volatile
+    private var activeProfile: WireGuardProfile? = null
+
+    @Volatile
+    private var activeStartId: Int = 0
+
+    @Volatile
+    private var activeWireGuard: Boolean = false
+
+    private var networkCallback: ConnectivityManager.NetworkCallback? = null
+
+    private val wireGuardStateListener = Runnable {
+        lifecycleExecutor.execute { refreshWireGuardHandshakeState() }
     }
 
     override fun onCreate() {
         super.onCreate()
+        activeInstance = this
         createNotificationChannel()
+        WgEgress.setRecoveryCallbacks(
+            Runnable { requestWireGuardRecovery() },
+            Runnable {
+                OperationalLogCatcher.warn(
+                    LogCategory.NETWORK_STATE,
+                    "WgEgress",
+                    "WireGuard connectivity monitor requested recovery"
+                )
+                updateNotification("WireGuard path degraded; recovering")
+                if (vpnState.value is VpnState.Connected) {
+                    _vpnState.value = VpnState.Starting("Recovering WireGuard connection")
+                }
+            }
+        )
+        registerUnderlyingNetworkCallback()
         OperationalLogCatcher.info(
             LogCategory.VPN_LIFECYCLE,
             "VpnService",
-            "Engine-neutral VianshieldVpnService created"
+            "Vianshield VPN service created; one service owns the TUN and packet engine"
         )
     }
 
@@ -73,48 +144,375 @@ class VianshieldVpnService : VpnService() {
     }
 
     private fun handleStartRequest(rawConfig: String, startId: Int) {
-        if (_vpnState.value is VpnState.Connected || _vpnState.value is VpnState.Starting) {
+        when (vpnState.value) {
+            is VpnState.Connected, is VpnState.Starting, is VpnState.Stopping -> {
+                OperationalLogCatcher.warn(
+                    LogCategory.VPN_LIFECYCLE,
+                    "VpnService",
+                    "Duplicate VPN start request ignored while a runtime transition is active"
+                )
+                return
+            }
+            else -> Unit
+        }
+
+        val profile = if (rawConfig.isBlank()) null else {
+            val result = WireGuardConfigParser.parse(rawConfig)
+            if (result.isFailure) {
+                val message = result.exceptionOrNull()?.message ?: "WireGuard profile validation failed"
+                _vpnState.value = VpnState.Error("ERR_CONFIG_INVALID", message)
+                OperationalLogCatcher.error(LogCategory.CONFIG_VALIDATION, "VpnService", message)
+                stopSelfResult(startId)
+                return
+            }
+            result.getOrThrow()
+        }
+
+        activeRawConfig = rawConfig
+        activeProfile = profile
+        activeStartId = startId
+
+        startForeground(
+            NOTIFICATION_ID,
+            buildNotification(
+                if (profile == null) "Starting local firewall protection" else "Starting WireGuard firewall"
+            )
+        )
+        _vpnState.value = VpnState.Starting(
+            if (profile == null) "Initializing local firewall" else "Preparing WireGuard and firewall"
+        )
+        lifecycleExecutor.execute { startRuntime(rawConfig, profile, startId) }
+    }
+
+    private fun startRuntime(rawConfig: String, profile: WireGuardProfile?, startId: Int) {
+        try {
+            // Re-entry (for example a retry after a previous failed start) must
+            // never leave an old native context or TUN descriptor behind.
+            stopRuntime()
+
+            appFirewallRules.reload()
+            val engine = ServiceSinkhole(VianshieldPacketCallbacks(this, appFirewallRules))
+            packetEngine = engine
+            engine.initialize(Build.VERSION.SDK_INT, Log.WARN, false)
+
+            val useWireGuard = profile != null
+            activeWireGuard = useWireGuard
+            engine.setWireGuardRequired(useWireGuard)
+            refreshFirewallRoutingNow(engine, useWireGuard)
+
+            _vpnState.value = VpnState.Starting("Establishing Android TUN interface")
+            val tun = establishTun(profile)
+            tunDescriptor = tun
+
+            // Start the packet loop before WireGuard resolves its peer endpoint.
+            // DNS used for a hostname endpoint can then pass through the native
+            // DNS path; non-DNS traffic remains fail-closed until WG is ready.
+            _vpnState.value = VpnState.Starting("Starting native firewall packet loop")
+            engine.runTunnel(tun.fd, true, 3)
+            if (!engine.isTunnelRunning()) {
+                throw IllegalStateException("Native packet loop did not remain active after startup")
+            }
+            _nativeEngineAvailable.value = true
+
+            if (profile == null) {
+                WgEgress.stop { engine.stopWireGuardSocketpair() }
+                engine.stopWireGuardSocketpair()
+                engine.setWireGuardRequired(false)
+                _vpnState.value = VpnState.Connected(
+                    FIREWALL_ONLY_ENDPOINT,
+                    "10.1.10.1/32, fd00:1::1/128",
+                    DEFAULT_FIREWALL_MTU
+                )
+                updateNotification("Local firewall protection active")
+                OperationalLogCatcher.info(
+                    LogCategory.VPN_LIFECYCLE,
+                    "VpnService",
+                    "Native firewall packet loop active without a WireGuard profile"
+                )
+                return
+            }
+
+            WgEgress.addStateListener(wireGuardStateListener)
+            _vpnState.value = VpnState.Starting("Starting userspace WireGuard tunnel")
+            val wgStarted = WgEgress.startOrUpdate(
+                true,
+                rawConfig,
+                this,
+                tun,
+                true,
+                false,
+                { engine.startWireGuardSocketpair() },
+                { engine.stopWireGuardSocketpair() },
+                { qname, aname, resource, ttl ->
+                    engine.wireGuardDnsResolved(qname, aname, resource, ttl)
+                }
+            )
+            if (!wgStarted) {
+                throw IllegalStateException(
+                    WgEgress.getLastError() ?: "Userspace WireGuard tunnel failed to start"
+                )
+            }
+
+            // startOrUpdate means the Rust tunnel was created, not that the
+            // peer handshake completed. Keep the UI in Connecting until the
+            // WgEgress watchdog reports a real handshake.
+            refreshWireGuardHandshakeState()
+            updateNotification("Waiting for WireGuard handshake")
+        } catch (error: Throwable) {
+            OperationalLogCatcher.error(
+                LogCategory.ENGINE_INIT,
+                "VpnService",
+                "VPN runtime startup failed: ${error.message ?: error.javaClass.simpleName}"
+            )
+            stopRuntime()
+            if (vpnState.value !is VpnState.Stopping) {
+                _vpnState.value = VpnState.Error(
+                    "ERR_ENGINE_START",
+                    error.message ?: "Vianshield could not start its packet engine"
+                )
+                stopForegroundSafely()
+                stopSelfResult(startId)
+            }
+        }
+    }
+
+    private fun establishTun(profile: WireGuardProfile?): ParcelFileDescriptor {
+        val builder = Builder()
+            .setSession(getString(R.string.app_name))
+            .setMtu(profile?.mtu ?: DEFAULT_FIREWALL_MTU)
+            .setBlocking(true)
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            builder.setMetered(false)
+        }
+
+        var hasIpv4 = false
+        var hasIpv6 = false
+        profile?.addresses.orEmpty().forEach { cidr ->
+            val parts = cidr.split("/", limit = 2)
+            require(parts.size == 2) { "Invalid tunnel interface address: $cidr" }
+            val address = parseNumericAddress(parts[0])
+                ?: throw IllegalArgumentException("Invalid numeric tunnel address: ${parts[0]}")
+            val prefix = parts[1].toIntOrNull()
+                ?: throw IllegalArgumentException("Invalid tunnel prefix length: $cidr")
+            val maxPrefix = if (address is Inet4Address) 32 else 128
+            require(prefix in 0..maxPrefix) { "Tunnel prefix length out of range: $cidr" }
+            builder.addAddress(address, prefix)
+            if (address is Inet4Address) hasIpv4 = true else if (address is Inet6Address) hasIpv6 = true
+        }
+
+        if (!hasIpv4) builder.addAddress(InetAddress.getByName("10.1.10.1"), 32)
+        if (!hasIpv6) builder.addAddress(InetAddress.getByName("fd00:1::1"), 128)
+
+        // One Android TUN catches both families. The native packet engine
+        // applies app policy and routes direct vs WireGuard per UID.
+        builder.addRoute(InetAddress.getByName("0.0.0.0"), 0)
+        builder.addRoute(InetAddress.getByName("::"), 0)
+
+        val dnsServers = profile?.dnsServers.orEmpty()
+            .mapNotNull(::parseNumericAddress)
+            .ifEmpty {
+                listOf(
+                    InetAddress.getByName("1.1.1.1"),
+                    InetAddress.getByName("1.0.0.1")
+                )
+            }
+        dnsServers.distinctBy { it.hostAddress }.forEach(builder::addDnsServer)
+
+        return builder.establish()
+            ?: throw IllegalStateException("Android did not establish the Vianshield TUN interface")
+    }
+
+    private fun parseNumericAddress(value: String): InetAddress? {
+        val candidate = value.trim().removePrefix("[").removeSuffix("]")
+        val validIpv4 = candidate.matches(Regex("""\d{1,3}(\.\d{1,3}){3}""")) &&
+            candidate.split(".").all { (it.toIntOrNull() ?: 256) in 0..255 }
+        val validIpv6 = candidate.contains(":") &&
+            candidate.all { it.isDigit() || it in "abcdefABCDEF:." }
+        if (!validIpv4 && !validIpv6) return null
+        return runCatching { InetAddress.getByName(candidate) }.getOrNull()
+    }
+
+    private fun currentDirectUids(): IntArray {
+        val directPackages = appFirewallRules.rules.value.values
+            .filter { it.mode == FirewallMode.DIRECT }
+            .map { it.packageName }
+            .toHashSet()
+        if (directPackages.isEmpty()) return intArrayOf()
+
+        return try {
+            packageManager.getInstalledApplications(0)
+                .asSequence()
+                .filter { it.packageName in directPackages }
+                .map { it.uid }
+                .distinct()
+                .toList()
+                .toIntArray()
+        } catch (error: Exception) {
             OperationalLogCatcher.warn(
                 LogCategory.VPN_LIFECYCLE,
                 "VpnService",
-                "Duplicate VPN start request ignored"
+                "Could not resolve Direct-mode app UIDs; WireGuard remains the default route"
             )
-            return
+            intArrayOf()
         }
+    }
 
-        startForeground(NOTIFICATION_ID, buildNotification("VPN engine integration pending"))
-        _vpnState.value = VpnState.Starting("Checking WireGuard profile")
-
-        val parseResult = if (rawConfig.isBlank()) {
-            Result.failure(IllegalArgumentException("Import a WireGuard profile before starting the VPN"))
-        } else {
-            WireGuardConfigParser.parse(rawConfig)
+    private fun refreshFirewallRouting() {
+        lifecycleExecutor.execute {
+            val engine = packetEngine ?: return@execute
+            if (!engine.isTunnelRunning()) return@execute
+            appFirewallRules.reload()
+            refreshFirewallRoutingNow(engine, activeWireGuard)
         }
+    }
 
-        if (parseResult.isFailure) {
-            val message = parseResult.exceptionOrNull()?.message ?: "WireGuard profile validation failed"
-            _vpnState.value = VpnState.Error("ERR_CONFIG_INVALID", message)
-            OperationalLogCatcher.error(LogCategory.CONFIG_VALIDATION, "VpnService", message)
-        } else {
-            val message = "VPN engine is not installed in this cleanup build. Protection has not started."
-            _vpnState.value = VpnState.Error("ERR_ENGINE_NOT_CONFIGURED", message)
-            OperationalLogCatcher.warn(LogCategory.ENGINE_INIT, "VpnService", message)
+    private fun refreshFirewallRoutingNow(engine: ServiceSinkhole, useWireGuard: Boolean) {
+        val directUids = currentDirectUids()
+        engine.setWireGuardRoute(
+            directUids,
+            defaultTunnel = useWireGuard,
+            dnsDirect = directUids.isNotEmpty()
+        )
+    }
+
+    private fun refreshWireGuardHandshakeState() {
+        if (!activeWireGuard || packetEngine == null || tunDescriptor == null) return
+        val handshake = WgEgress.latestHandshakeMillisOrNull() ?: 0L
+        if (handshake > 0L) {
+            val profile = activeProfile
+            _vpnState.value = VpnState.Connected(
+                profile?.let { "${it.endpointHost}:${it.endpointPort}" } ?: FIREWALL_ONLY_ENDPOINT,
+                profile?.addresses?.joinToString(", ") ?: "",
+                profile?.mtu ?: DEFAULT_FIREWALL_MTU
+            )
+            updateNotification("WireGuard firewall active")
+        } else if (vpnState.value !is VpnState.Stopping && vpnState.value !is VpnState.Error) {
+            _vpnState.value = VpnState.Starting("Waiting for WireGuard handshake")
         }
+    }
 
-        stopForegroundSafely()
-        stopSelfResult(startId)
+    internal fun onNativePacketFailure(error: Int, message: String) {
+        val current = vpnState.value
+        if (current !is VpnState.Connected && current !is VpnState.Starting) return
+        lifecycleExecutor.execute {
+            val latest = vpnState.value
+            if (latest !is VpnState.Connected && latest !is VpnState.Starting) return@execute
+            stopRuntime()
+            _vpnState.value = VpnState.Error(
+                "ERR_NATIVE_PACKET_LOOP",
+                "Native packet engine stopped ($error): $message"
+            )
+            stopForegroundSafely()
+            stopSelf()
+        }
+    }
+
+    private fun requestWireGuardRecovery() {
+        if (!activeWireGuard) return
+        lifecycleExecutor.execute {
+            val engine = packetEngine ?: return@execute
+            val tun = tunDescriptor ?: return@execute
+            if (!engine.isTunnelRunning()) return@execute
+            _vpnState.value = VpnState.Starting("Recovering WireGuard connection")
+            try {
+                val restarted = WgEgress.startOrUpdate(
+                    true,
+                    activeRawConfig,
+                    this,
+                    tun,
+                    true,
+                    false,
+                    { engine.startWireGuardSocketpair() },
+                    { engine.stopWireGuardSocketpair() },
+                    { qname, aname, resource, ttl ->
+                        engine.wireGuardDnsResolved(qname, aname, resource, ttl)
+                    }
+                )
+                if (!restarted) {
+                    throw IllegalStateException(
+                        WgEgress.getLastError() ?: "WireGuard tunnel restart failed"
+                    )
+                }
+                refreshWireGuardHandshakeState()
+            } catch (error: Throwable) {
+                stopRuntime()
+                _vpnState.value = VpnState.Error(
+                    "ERR_WIREGUARD_RECOVERY",
+                    error.message ?: "WireGuard recovery failed"
+                )
+                stopForegroundSafely()
+                stopSelf()
+            }
+        }
     }
 
     private fun handleStopRequest(startId: Int) {
         _vpnState.value = VpnState.Stopping
-        stopForegroundSafely()
-        _vpnState.value = VpnState.Stopped
-        OperationalLogCatcher.info(
-            LogCategory.VPN_LIFECYCLE,
-            "VpnService",
-            "VPN service stop request completed; no engine was active"
-        )
-        stopSelfResult(startId)
+        lifecycleExecutor.execute {
+            stopRuntime()
+            _vpnState.value = VpnState.Stopped
+            OperationalLogCatcher.info(
+                LogCategory.VPN_LIFECYCLE,
+                "VpnService",
+                "Vianshield firewall and VPN runtime stopped"
+            )
+            stopForegroundSafely()
+            stopSelfResult(startId)
+        }
+    }
+
+    /**
+     * Stop ordering is deliberate: the native loop no longer reads or writes
+     * the TUN before the WireGuard bridge is stopped and the TUN descriptor
+     * is closed.
+     */
+    private fun stopRuntime() {
+        val oldEngine = packetEngine
+        val oldTun = tunDescriptor
+        packetEngine = null
+        tunDescriptor = null
+        activeWireGuard = false
+        _nativeEngineAvailable.value = false
+
+        WgEgress.removeStateListener(wireGuardStateListener)
+        if (oldEngine != null) {
+            runCatching { oldEngine.stopTunnel() }
+            runCatching { WgEgress.stop { oldEngine.stopWireGuardSocketpair() } }
+            runCatching { oldEngine.stopWireGuardSocketpair() }
+            runCatching { oldEngine.setWireGuardRequired(false) }
+            runCatching { oldEngine.close() }
+        } else {
+            runCatching { WgEgress.stop { } }
+        }
+        runCatching { oldTun?.close() }
+    }
+
+    private fun registerUnderlyingNetworkCallback() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N) return
+        val manager = getSystemService(ConnectivityManager::class.java) ?: return
+        val callback = object : ConnectivityManager.NetworkCallback() {
+            override fun onAvailable(network: Network) {
+                if (activeWireGuard && WgEgress.isRunning()) {
+                    WgEgress.onUnderlyingNetworkChanged()
+                }
+            }
+        }
+        try {
+            manager.registerDefaultNetworkCallback(callback)
+            networkCallback = callback
+        } catch (error: Exception) {
+            OperationalLogCatcher.warn(
+                LogCategory.NETWORK_STATE,
+                "VpnService",
+                "Underlying network monitor could not be registered: ${error.message}"
+            )
+        }
+    }
+
+    private fun updateNotification(status: String) {
+        getSystemService(NotificationManager::class.java)
+            ?.notify(NOTIFICATION_ID, buildNotification(status))
     }
 
     private fun createNotificationChannel() {
@@ -134,21 +532,16 @@ class VianshieldVpnService : VpnService() {
     private fun buildNotification(statusText: String): Notification {
         val launchIntent = Intent(this, MainActivity::class.java)
         val pendingIntent = PendingIntent.getActivity(
-            this,
-            0,
-            launchIntent,
+            this, 0, launchIntent,
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
         val stopIntent = Intent(this, VianshieldVpnService::class.java).apply {
             action = ACTION_STOP_VPN
         }
         val stopPendingIntent = PendingIntent.getService(
-            this,
-            1,
-            stopIntent,
+            this, 1, stopIntent,
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
-
         return NotificationCompat.Builder(this, NOTIFICATION_CHANNEL_ID)
             .setContentTitle(getString(R.string.vpn_title))
             .setContentText(statusText)
@@ -164,18 +557,25 @@ class VianshieldVpnService : VpnService() {
         try {
             stopForeground(STOP_FOREGROUND_REMOVE)
         } catch (_: Exception) {
-            // The service may already have left the foreground state.
+            // Service may already have exited foreground state.
         }
     }
 
     override fun onDestroy() {
-        if (_vpnState.value !is VpnState.Error) {
-            _vpnState.value = VpnState.Stopped
+        runCatching { stopRuntime() }
+        networkCallback?.let { callback ->
+            runCatching {
+                getSystemService(ConnectivityManager::class.java)?.unregisterNetworkCallback(callback)
+            }
         }
+        WgEgress.setRecoveryCallbacks(Runnable {}, Runnable {}, null)
+        if (activeInstance === this) activeInstance = null
+        lifecycleExecutor.shutdownNow()
+        if (vpnState.value !is VpnState.Error) _vpnState.value = VpnState.Stopped
         OperationalLogCatcher.info(
             LogCategory.VPN_LIFECYCLE,
             "VpnService",
-            "VianshieldVpnService destroyed"
+            "Vianshield VPN service destroyed"
         )
         super.onDestroy()
     }
@@ -186,8 +586,7 @@ class VianshieldVpnService : VpnService() {
             "VpnService",
             "VPN permission revoked by system or another VPN application started"
         )
-        _vpnState.value = VpnState.Stopped
-        stopForegroundSafely()
+        handleStopRequest(activeStartId)
         super.onRevoke()
     }
 }
