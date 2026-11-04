@@ -95,6 +95,7 @@ import com.example.ui.theme.StatusError
 import com.example.ui.theme.StatusStarting
 import com.example.ui.theme.StatusStopped
 import com.example.vpn.VpnState
+import com.example.vpn.VianshieldVpnService
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -104,6 +105,7 @@ fun MainScreen(
     modifier: Modifier = Modifier
 ) {
     val vpnState by viewModel.vpnState.collectAsState()
+    val nativeEngineActive by VianshieldVpnService.nativeEngineAvailable.collectAsState()
     val activeProfile by viewModel.activeProfile.collectAsState()
     val speedPreset by viewModel.speedPreset.collectAsState()
     val dnsProvider by viewModel.dnsProvider.collectAsState()
@@ -401,7 +403,7 @@ fun MainScreen(
                             modifier = Modifier.padding(vertical = 2.dp)
                         ) {
                             Text(
-                                text = "Engine integration pending",
+                                text = "Local firewall + WireGuard",
                                 color = SkyBlueOnPrimaryContainer,
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.SemiBold,
@@ -437,6 +439,7 @@ fun MainScreen(
             PrimaryActionButton(
                 vpnState = vpnState,
                 activeProfile = activeProfile,
+                nativeEngineActive = nativeEngineActive,
                 onToggle = {
                     val intent = viewModel.checkPermissionIntent()
                     if (intent != null) {
@@ -462,7 +465,7 @@ fun MainScreen(
                 icon = Icons.Default.Dns,
                 title = "DNS Changer",
                 value = dnsProvider,
-                statusTag = "Active",
+                statusTag = "Selected",
                 onClick = { showDnsDialog = true },
                 testTag = "main_dns_changer_row"
             )
@@ -561,7 +564,8 @@ fun MainScreen(
             // 6. Actual Protection Status and Relevant Errors
             ConnectionStatusCard(
                 vpnState = vpnState,
-                activeProfile = activeProfile
+                activeProfile = activeProfile,
+                nativeEngineActive = nativeEngineActive
             )
 
             // Error Banner (shown if VPN is in Error state)
@@ -706,9 +710,11 @@ private fun DashboardControlRow(
 private fun PrimaryActionButton(
     vpnState: VpnState,
     activeProfile: com.example.config.WireGuardProfile?,
+    nativeEngineActive: Boolean,
     onToggle: () -> Unit
 ) {
-    val isConnected = vpnState is VpnState.Connected
+    val isConnected = vpnState is VpnState.Connected && nativeEngineActive
+    val isFirewallOnly = (vpnState as? VpnState.Connected)?.endpoint == "Local firewall"
     val isTransitioning = vpnState is VpnState.Starting || vpnState is VpnState.Stopping
 
     val iconColor = when {
@@ -721,12 +727,14 @@ private fun PrimaryActionButton(
     val (statusLabel, statusTag) = when {
         vpnState is VpnState.Starting -> "CONNECTING" to "Negotiating"
         vpnState is VpnState.Stopping -> "DISCONNECTING" to "Teardown"
+        isConnected && isFirewallOnly -> "FIREWALL ACTIVE" to "Protected"
         isConnected -> "WIREGUARD ACTIVE" to "Protected"
         vpnState is VpnState.Error -> "PROTECTION ERROR" to "Failed"
         else -> "WIREGUARD OFF" to "Standby"
     }
 
     val subtitle = when {
+        isConnected && isFirewallOnly -> "Local firewall is filtering device traffic"
         isConnected -> {
             val endpoint = (vpnState as? VpnState.Connected)?.endpoint
                 ?: activeProfile?.let { "${it.endpointHost}:${it.endpointPort}" }
@@ -876,10 +884,15 @@ private fun PrimaryActionButton(
 @Composable
 private fun ConnectionStatusCard(
     vpnState: VpnState,
-    activeProfile: com.example.config.WireGuardProfile?
+    activeProfile: com.example.config.WireGuardProfile?,
+    nativeEngineActive: Boolean
 ) {
     val (statusColor, statusText, statusIcon) = when (vpnState) {
-        is VpnState.Connected -> Triple(StatusConnected, "Protection Active", Icons.Default.CheckCircle)
+        is VpnState.Connected -> Triple(
+            StatusConnected,
+            if (vpnState.endpoint == "Local firewall") "Firewall Active" else "Protection Active",
+            Icons.Default.CheckCircle
+        )
         is VpnState.Starting -> Triple(StatusStarting, "Establishing Tunnel...", Icons.Default.HourglassEmpty)
         is VpnState.Stopping -> Triple(StatusStarting, "Stopping Tunnel...", Icons.Default.HourglassEmpty)
         is VpnState.Error -> Triple(StatusError, "Protection Error", Icons.Default.Error)
@@ -927,7 +940,11 @@ private fun ConnectionStatusCard(
             Spacer(modifier = Modifier.height(4.dp))
 
             val subtitle = when (vpnState) {
-                is VpnState.Connected -> "WireGuard tunnel routing active on vianshield-tun"
+                is VpnState.Connected -> if (vpnState.endpoint == "Local firewall") {
+                    "Local firewall is processing device traffic"
+                } else {
+                    "WireGuard tunnel routing active on vianshield-tun"
+                }
                 is VpnState.Starting -> "Creating TUN interface and initializing native BoxService"
                 is VpnState.Stopping -> "Closing TUN descriptors and stopping BoxService"
                 is VpnState.Error -> vpnState.message
@@ -983,14 +1000,14 @@ private fun ConnectionStatusCard(
                         modifier = Modifier
                             .size(6.dp)
                             .clip(CircleShape)
-                            .background(if (false) StatusConnected else StatusStarting)
+                            .background(if (nativeEngineActive) StatusConnected else StatusStarting)
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
-                        text = if (false)
-                            "VPN engine not integrated"
+                        text = if (nativeEngineActive)
+                            "Native packet engine running"
                         else
-                            "Runtime integration pending",
+                            "Native packet engine stopped",
                         fontSize = 10.sp,
                         color = SkyBlueTextSecondary,
                         fontWeight = FontWeight.Medium

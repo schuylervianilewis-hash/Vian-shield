@@ -66,6 +66,7 @@ import com.example.ui.theme.StatusError
 import com.example.ui.theme.StatusStarting
 import com.example.ui.theme.StatusStopped
 import com.example.vpn.VpnState
+import com.example.vpn.VianshieldVpnService
 
 @Composable
 fun DiagnosticsPanel(
@@ -73,7 +74,7 @@ fun DiagnosticsPanel(
     modifier: Modifier = Modifier
 ) {
     val vpnState by viewModel.vpnState.collectAsState()
-    val isNativeAvailable = false
+    val isNativeAvailable by VianshieldVpnService.nativeEngineAvailable.collectAsState()
 
     Column(
         modifier = modifier
@@ -106,7 +107,7 @@ fun DiagnosticsPanel(
                             color = if (isNativeAvailable) SkyBluePrimaryContainer else Color(0xFFFEF3C7)
                         ) {
                             Text(
-                                text = "Engine not integrated",
+                                text = if (isNativeAvailable) "Native packet engine running" else "Native packet engine stopped",
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.SemiBold,
                                 color = if (isNativeAvailable) SkyBlueOnPrimaryContainer else Color(0xFF92400E),
@@ -117,15 +118,16 @@ fun DiagnosticsPanel(
 
                     Spacer(modifier = Modifier.height(12.dp))
 
-                    DiagnosticRow("VPN Engine", "Not integrated — protection unavailable")
-                    DiagnosticRow("Native Engine", "No engine binary included")
-                    DiagnosticRow("Integration Architecture", "Engine-neutral Android VPN service")
-                    DiagnosticRow("Userspace Network Stack", "Pending runtime integration")
-                    DiagnosticRow("Socket Loop Protection", "VpnService.protect(fd) enforced")
-                    DiagnosticRow("Sandbox Storage Paths", "filesDir / cacheDir (App-Private)")
-                    DiagnosticRow("Config Validation", "WireGuard profile parser only")
-                    DiagnosticRow("Lifecycle Serialization", "Android service lifecycle")
-                    DiagnosticRow("Teardown Ordering", "No active engine or TUN in this build")
+                    DiagnosticRow("VPN Engine", "TrackerControl / NetGuard packet engine")
+                    DiagnosticRow("Native Engine", "libnetguard.so")
+                    DiagnosticRow("WireGuard Bridge", "libwgbridge.so · GotaTun")
+                    DiagnosticRow("Integration Architecture", "One VianshieldVpnService owns the TUN")
+                    DiagnosticRow("Userspace Network Stack", if (isNativeAvailable) "Initialized and running" else "Bundled; currently stopped")
+                    DiagnosticRow("Socket Loop Protection", "VpnService.protect(fd) on tunnel sockets")
+                    DiagnosticRow("Sandbox Storage Paths", "filesDir / cacheDir (App-private)")
+                    DiagnosticRow("Config Validation", "WireGuard profile validation before startup")
+                    DiagnosticRow("Lifecycle Serialization", if (isNativeAvailable) "Native packet loop active" else "Native runtime stopped")
+                    DiagnosticRow("Teardown Ordering", "Native packet loop → WireGuard → TUN descriptor")
                 }
             }
 

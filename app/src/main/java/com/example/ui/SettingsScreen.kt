@@ -152,7 +152,7 @@ fun SettingsScreen(
                     Spacer(modifier = Modifier.height(10.dp))
                     SettingsInfoRow("Version", "1.0")
                     HorizontalDivider(color = SkyBlueSurfaceBorder, modifier = Modifier.padding(vertical = 6.dp))
-                    SettingsInfoRow("VPN engine", "TrackerControl integration in progress")
+                    SettingsInfoRow("VPN engine", "TrackerControl / NetGuard + GotaTun")
                     HorizontalDivider(color = SkyBlueSurfaceBorder, modifier = Modifier.padding(vertical = 6.dp))
                     SettingsInfoRow("Architecture", "ARMv7 · ARM64")
                     HorizontalDivider(color = SkyBlueSurfaceBorder, modifier = Modifier.padding(vertical = 6.dp))
