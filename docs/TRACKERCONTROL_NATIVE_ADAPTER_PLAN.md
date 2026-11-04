@@ -3,101 +3,74 @@
 Baseline: TrackerControl commit `4a3d1939b3e7859540367e15d597d54cb2e6a118`.
 Target: Vianshield branch `refactor/engine-neutral-purge`.
 
-This is the implementation contract for the first runtime-integration phase. The pinned submodule remains a source reference; no TrackerControl runtime is linked into the APK yet.
+This plan originally described the extraction sequence. The current branch has implemented the native packet facade, service lifecycle and WireGuard bridge portions. Physical-device validation and tracker/domain intelligence remain outstanding.
 
 ## 1. Confirmed JNI boundary
 
-The packet engine is not a standalone C library with a generic API. Its JNI exports are hard-bound to these Java class names:
+The native packet engine resolves the following Java contract:
 
-- `eu.faircode.netguard.ServiceSinkhole`: `jni_init`, `jni_start`, `jni_run`, `jni_stop`, `jni_clear`, `jni_get_mtu`, `jni_get_stats`, `jni_pcap`, `jni_socks5`, `jni_sni`, WireGuard start/stop/required/route, and `jni_done`.
-- `eu.faircode.netguard.Util`: native property/address helpers and memory profiling.
+- `eu.faircode.netguard.ServiceSinkhole`: JNI init/start/run/stop/clear/stats/MTU, WireGuard socketpair/route controls and teardown.
+- Model classes: `Packet`, `Allowed`, `ResourceRecord`, `Usage`.
+- Callback methods: native exit/error, protect, packet log, DNS record, domain-block decision, UID attribution, address policy and usage accounting.
 
-The C engine also resolves these Java model classes by fully-qualified name:
+These names and signatures form a runtime ABI. Changes to the facade must be reviewed against the pinned C JNI source.
 
-- `eu.faircode.netguard.Packet`
-- `eu.faircode.netguard.Allowed`
-- `eu.faircode.netguard.ResourceRecord`
-- `eu.faircode.netguard.Usage`
+## 2. Vianshield ownership boundary — implemented
 
-It calls back into the service instance for:
+- `com.example.vpn.VianshieldVpnService` is the only Android `VpnService` and TUN owner.
+- `eu.faircode.netguard.ServiceSinkhole` is a plain JNI compatibility facade, not a service.
+- The native packet loop borrows the TUN FD. Vianshield stops and joins the loop before closing the FD.
+- `WgEgress` optionally owns the GotaTun userspace tunnel behind the same TUN.
+- Native start/stop/reconfigure work is serialized on a single lifecycle executor.
 
-- `nativeExit(int, String)`
-- `nativeError(int, String)`
-- `protect(int)`
-- `logPacket(Packet)`
-- `dnsResolved(ResourceRecord)`
-- `isDomainBlocked(String)`
-- `getUidQ(int, int, String, int, String, int)`
-- `isAddressAllowed(Packet)`
-- `accountUsage(Usage)`
+## 3. Native packet engine — integrated in the branch
 
-These are runtime contracts: a renamed/missing class, method, signature, or field can compile and still fail when JNI resolves it. Any adapter must preserve or deliberately change all of these names/signatures together.
+CMake builds the pinned NetGuard packet-engine sources as `libnetguard.so` and links the Rust `libwgbridge.so` dependency required by the DNS C ABI.
 
-## 2. Vianshield ownership boundary
+The CMake configuration also creates pinned-source patched copies of `netguard.c` and `session.c`. A policy-refresh signal is raised when the native UID routing table is updated; the packet loop re-evaluates existing sessions under its session lock. CMake fails closed at build time if the expected pinned-source anchors are absent.
 
-Keep `com.example.vpn.VianshieldVpnService` as the only Android `VpnService` and the only owner of the TUN descriptor.
+## 4. Packet policy — integrated, live behavior unverified on devices
 
-TrackerControl's `ServiceSinkhole` must not be copied as a second `VpnService`, registered in the manifest, or started alongside Vianshield's service.
+- Known installed apps default to allowed firewall traffic unless blocked.
+- BLOCK wins for all packages sharing a UID.
+- Direct routing is selected only when every package sharing the UID explicitly selects Direct.
+- Otherwise, traffic follows the default route (WireGuard when a profile is active; direct/local firewall path without a profile).
+- The service uses Android Q+ connection-owner UID lookup; native NetGuard UID lookup handles older Android versions.
+- Unknown app-range UIDs are denied. Unowned system UIDs below 2000 retain the upstream safe-system fallback.
+- App rules persist in app-private preferences and are pushed into the native route/policy layer.
 
-Introduce a plain-Java/Kotlin engine adapter (not an Android service) that owns the JNI context and exposes a narrow lifecycle:
+These are code-path descriptions, not device test results. Validate blocked connectivity, IPv4/IPv6, DNS, existing flows and Direct behavior on physical devices.
 
-1. initialize native context;
-2. start packet worker with the TUN fd;
-3. stop packet worker and wait for native exit;
-4. clear native context and close owned descriptors;
-5. publish packet, DNS, usage, and error callbacks to Vianshield repositories.
+## 5. WireGuard bridge — integrated, live handshake unverified on devices
 
-The Vianshield service remains responsible for Android VPN permission, foreground notification, TUN establishment, network callbacks, and final descriptor ownership. The adapter must never close the TUN fd unless ownership has explicitly transferred.
+- Rust GotaTun bridge is built by the Vianshield Gradle/Cargo/NDK workflow.
+- Pinned Java wrappers and the `WgEgress` adapter are included.
+- WireGuard uses the same Vianshield TUN and native packet engine.
+- The service marks WireGuard Connected only after a peer handshake is observed; a created native tunnel alone is not reported as connected.
+- Network-change rebind/recovery is wired through the existing WgEgress monitor callbacks.
 
-## 3. Extraction sequence
+A successful Rust/native compile does not prove UDP sockets can handshake or carry app traffic on a device.
 
-### Stage A — isolate the JNI contract
+## 6. DNS and tracker integration status
 
-- Extract the four packet/data model classes and the JNI facade with their upstream signatures.
-- Decide whether to preserve upstream package names initially (lowest-risk JNI port) or rename all C exports and class lookups to a Vianshield namespace (cleaner, larger change).
-- Add compile-time and instrumentation tests for JNI class/method resolution before enabling packet processing.
-- Keep the native library unreferenced by the live VPN service until the facade contract passes.
+- Android TUN DNS server selection is persisted and applies Profile Default, Cloudflare, Quad9, Google or AdGuard DNS.
+- Changing the DNS choice reconfigures the active Vianshield TUN.
+- `isDomainBlocked(String)` currently returns false. The local Ad/Tracker filter and saved domain allow-list do not yet enforce DNS blocking.
+- DNS record and usage callbacks do not currently populate a tracker evidence store.
+- The Tracker tab remains a placeholder.
 
-### Stage B — packet engine build
+## 7. Build and validation
 
-- Add only the NetGuard packet-engine C sources from `app/src/main/jni/netguard/` to Vianshield's CMake target.
-- Do not copy TrackerControl's whole application Gradle configuration, app ID, manifest, theme, or activities.
-- Do not add the Rust WireGuard bridge to this stage; first prove direct packet forwarding and per-app policy independently.
-- Preserve upstream source notices and inventory each native dependency/license before distribution.
+- GitHub Actions runs JDK 17, Android SDK/NDK/CMake, pinned Rust toolchain, Gradle unit tests, dual-ARM debug APK assembly, APK verification and artifact upload.
+- Check the workflow run attached to the exact branch HEAD before claiming that commit passed CI.
+- Physical-device testing is still required for local firewall enforcement, WireGuard handshake/data, network handover, permission revoke, reboot, repeated start/stop and FD/thread cleanup.
 
-### Stage C — service adapter
+## 8. Remaining sequence
 
-- Establish the TUN using Vianshield's service.
-- Start the native packet worker through the facade.
-- Implement the callback policy using Vianshield-owned settings/repositories: per-app allow/block, domain blocking, UID attribution, DNS/resource evidence, and bounded usage logging.
-- Make start/stop idempotent and serialize all native lifecycle calls.
-- On any initialization, callback, or packet-worker failure, close the TUN and report protection as stopped/error. Never display Connected until the native worker is actually running.
+1. Finish a green CI run for the current native policy-refresh and live-profile reconfiguration changes.
+2. Run physical-device validation against the checklist in `BLUEPRINT.md`.
+3. Implement local domain blocking with a documented DNS-filter syntax/parser, explicit source/license attribution, bounded update/cache behavior and allow-list precedence.
+4. Add tracker evidence/usage/country attribution only after packet/DNS evidence is being collected with the agreed privacy boundaries.
+5. Implement real socket-buffer/speed policy only after the user-facing semantics are defined and verified.
+6. Integrate Sidebar Main/Heavy process ownership only after the standalone runtime passes.
 
-### Stage D — validation before WireGuard
-
-- Verify per-app block means no network access, including IPv4/IPv6 and DNS.
-- Verify allowed apps retain direct internet access.
-- Verify DNS/domain filtering and app attribution.
-- Verify foreground/background transitions, revoke, force-stop/restart, reboot, Wi-Fi/mobile handover, and repeated start/stop.
-- Test on physical Android devices; emulator build success is not packet-path validation.
-
-### Stage E — WireGuard and tracker intelligence
-
-Only after Stage D passes, integrate GotaTun's Rust bridge through a separate adapter. Then add tracker signatures/analysis, data and country attribution, and Vianshield-native Tracker UI. Keep filtering decisions and remote VPN routing as independent policy dimensions.
-
-## 4. Current implementation status
-
-- TrackerControl source is pinned as a Git submodule.
-- License notice and source audit are present.
-- Vianshield's existing VPN service is an engine-neutral fail-closed shell.
-- No TrackerControl C library is currently linked into the Vianshield APK.
-- No per-app packet policy or DNS filtering is active yet.
-- The current build workflow run is still pending; its status must be checked before claiming CI success.
-
-## 5. Do-not-do list
-
-- Do not start TrackerControl's `ServiceSinkhole` beside Vianshield's VPN service.
-- Do not copy the upstream app module wholesale.
-- Do not add WireGuard before direct packet processing and app blocking are proven.
-- Do not report VPN Connected merely because Android granted VPN permission or a TUN fd was created.
-- Do not claim operational firewall protection based on native compilation alone.

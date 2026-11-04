@@ -1,72 +1,92 @@
 # TrackerControl Import Audit
 
-Audit baseline: TrackerControl upstream commit `4a3d1939b3e7859540367e15d597d54cb2e6a118` (2026-11-01).
+Audit baseline: TrackerControl upstream commit `4a3d1939b3e7859540367e15d597d54cb2e6a118`.
 
-Source checkout: `third_party/tracker-control` Git submodule. This document describes the upstream structure at the pinned revision; it does not claim that these components are already linked into the Vianshield APK.
+Source checkout: `third_party/tracker-control` Git submodule. This document separates the upstream source inventory from the Vianshield implementation status.
 
-## 1. What TrackerControl actually contains
+## 1. Upstream source inventory
 
-TrackerControl is a complete Android application, not a drop-in firewall library. Its implementation has four tightly connected parts:
+TrackerControl is a complete Android application, not a drop-in firewall library. The pinned source contains:
 
-1. Android VPN service and lifecycle: `eu.faircode.netguard.ServiceSinkhole`, plus `ApplicationEx`, service receivers/workers, VPN replacement/restart policy, foreground notification and Android manifest declarations.
-2. Native packet engine: C sources under `app/src/main/jni/netguard/`, built as `libnetguard.so`. The JNI boundary exchanges packet, UID, routing, DNS and usage information with Java.
-3. WireGuard transport: Rust project `wgbridge-rs/` (GotaTun-based), Java JNI wrappers under `net/kollnig/missioncontrol/wgbridge/`, and the Gradle script `app/gradle/wgbridge.gradle` which builds ABI-specific `libwgbridge.so` using Cargo/cargo-ndk and the Android NDK.
-4. Tracker intelligence and presentation: tracker signatures/analysis, tracker and blocklist models, app/domain usage storage, country lookup, and Android/Compose screens.
+1. Android VPN service/lifecycle: `eu.faircode.netguard.ServiceSinkhole`, plus application/service receivers/workers, restart policy, foreground notification and manifest declarations.
+2. Native packet engine: C sources under `app/src/main/jni/netguard/`, built as `libnetguard.so`.
+3. WireGuard transport: Rust `wgbridge-rs/` (GotaTun-based), Java JNI wrappers under `net/kollnig/missioncontrol/wgbridge/`, and native CMake/Gradle integration.
+4. Tracker intelligence and presentation: signature/analysis components, tracker and blocklist models, app/domain usage storage, country lookup and Android/Compose screens.
 
-## 2. Runtime components to adapt
+The upstream source includes dependencies and datasets whose licensing must be evaluated individually. The root GPL-3.0 license does not prove that every nested asset is GPL-compatible.
 
-### VPN service and packet processing
+## 2. Vianshield integration boundary
 
-- `eu.faircode.netguard.ServiceSinkhole` owns the upstream `VpnService` and its TUN lifecycle.
-- `app/src/main/jni/netguard/netguard.c`, `ip.c`, `tcp.c`, `udp.c`, `dns.c`, `policy.c` and supporting files implement the packet path and JNI.
-- `DatabaseHelper`, `Rule`, `Allowed`, `Packet`, `ResourceRecord` and `Usage` provide the Java-side models/storage used by the packet path.
+Vianshield retains `com.example.vpn.VianshieldVpnService` as the sole Android VPN and TUN owner. It does **not** start the upstream `ServiceSinkhole` Android service.
 
-**Integration constraint:** Vianshield must retain one authoritative VPN service/TUN owner. Do not register or start TrackerControl's `ServiceSinkhole` beside `VianshieldVpnService`. The packet engine and service logic must be extracted/adapted behind Vianshield's existing lifecycle, or the existing service must be deliberately replaced after a reviewed migration. Two concurrent VPN service owners are not an acceptable integration.
+The class name `eu.faircode.netguard.ServiceSinkhole` is retained only as a plain-Java JNI compatibility facade. It owns a native context and packet worker, but not an Android service or the TUN descriptor.
 
-### WireGuard
+The current runtime structure is:
 
-- Rust source: `wgbridge-rs/`, including the `tc-dns` crate.
-- Build: `app/gradle/wgbridge.gradle` plus `app/CMakeLists.txt`.
-- JNI wrapper: `Wgbridge`, `Tunnel`, `TunnelStats`, `Protector`, `Logger`, `DnsRecorder`.
-- ABI list in upstream build: armeabi-v7a, arm64-v8a, x86, x86_64.
+```text
+VianshieldVpnService
+  ├── Android TUN / foreground lifecycle / network callback
+  ├── ServiceSinkhole (plain JNI facade)
+  │     └── libnetguard.so (pinned TrackerControl C packet engine)
+  └── WgEgress (optional)
+        └── Wgbridge / libwgbridge.so (GotaTun Rust tunnel)
+```
 
-The existing Vianshield WireGuard profile parser is not equivalent to the upstream UAPI configuration, socketpair, tunnel, protector, DNS recorder and callback contract. A deliberate adapter and lifecycle/FD ownership review is required. Do not claim WireGuard is operational merely because the Rust library compiles.
+## 3. Components now present in Vianshield branch
 
-### Tracker intelligence and UI
+- JNI facade and upstream model classes: `Packet`, `Allowed`, `ResourceRecord`, `Usage`.
+- NetGuard C packet engine built through Vianshield CMake.
+- Pinned-source CMake patch for refreshing established sessions after native route/policy changes.
+- Per-app policy callbacks, UID attribution, Direct UID route table and shared-UID handling.
+- GotaTun bridge JNI wrappers, adapted `WgEgress`, config serialization and connectivity monitor.
+- Encrypted WireGuard profile storage backed by Android Keystore.
+- Vianshield-owned TUN, foreground notification, native packet worker, optional WireGuard egress and serialized teardown/reconfigure path.
 
-- Tracker identification: `TrackerAnalysisManager`, `TrackerAnalysisWorker`, `TrackerLibraryAnalyser`, `TrackerSignatureManager`, `SignatureTrie`.
-- Tracker data: `Tracker`, `TrackerList`, `TrackerCategory`, `TrackerContact`, `TrackerBlocklist`, `TrackerFeedLogic`, `TrackerStatusLogic`.
-- Per-app evidence: `DatabaseHelper`, `Usage`, DNS/resource records and host observations.
-- Country attribution: `CountriesFragment` and GeoLite2 country database.
-- UI reference: upstream app list/details, tracker, data and country views, including Compose screens and legacy fragment/activity integration.
+The branch includes these code paths; device-level correctness remains unverified until tested on physical Android devices.
 
-Vianshield should adapt the data models and view logic into its own Compose navigation and theme rather than importing TrackerControl's launcher, activities, fragments, theme or duplicate app shell.
+## 4. Upstream modules not yet adapted
 
-## 3. Native build and dependencies
+Tracker analysis and presentation are still outstanding. Relevant upstream sources include:
 
-Upstream currently uses:
-- Android Gradle application module with compile SDK 37 and Java 17.
-- CMake to build `libnetguard.so`.
-- Rust/Cargo and `cargo-ndk` to build `libwgbridge.so`.
-- Android NDK version pinned in `app/gradle/wgbridge.gradle`.
-- Additional AndroidX, WorkManager, Compose, database, GeoIP, DEX analysis and image dependencies declared in upstream `app/build.gradle`.
+- `TrackerAnalysisManager`, `TrackerAnalysisWorker`, `TrackerLibraryAnalyser`, `TrackerSignatureManager`, `SignatureTrie`.
+- `Tracker`, `TrackerList`, `TrackerCategory`, `TrackerContact`, `TrackerBlocklist`, `TrackerFeedLogic`, `TrackerStatusLogic`.
+- Per-app/domain evidence storage through `DatabaseHelper`, `Usage`, DNS/resource records and host observations.
+- GeoLite2 country data and related attribution UI.
+- Upstream Android launcher/activity/fragment screens, which should not be imported as a second app shell.
 
-Do not copy the upstream Gradle file wholesale. Vianshield has a different application ID, namespace, Compose UI, min/target SDK decisions, test setup, lifecycle, and CI pipeline. Extract the required dependencies and native tasks incrementally, keeping Vianshield's build as the root build.
+Vianshield's Tracker tab is still a placeholder. The JNI usage/DNS callbacks are not yet connected to a tracker evidence store.
 
-## 4. Data and licensing audit still required
+## 5. DNS filtering status
 
-The upstream tree includes assets such as `trackers.json`, `hosts.txt`, `GeoLite2-Country.mmdb`, and several tracker/blocklist datasets. The repository's top-level GPL-3.0 license does not establish the license of every bundled dataset or third-party library. Before copying each data asset or generated database into Vianshield, record its origin, license, redistribution terms, update mechanism and attribution.
+The native packet engine exposes a domain decision callback. Vianshield currently returns `false` from `isDomainBlocked(String)`, so local domain blocking is not active.
 
-Also inventory the licenses for native dependencies (including GotaTun and Rust crates), Gradle dependencies, fonts, icons, images, GeoIP data and downloaded feeds. Keep the original notices for every copied component and mark modified source files.
+The DNS provider selector changes the DNS server list installed on the Android TUN. Selecting AdGuard DNS uses that external resolver; it must not be described as the local Vianshield Ad/Tracker filter.
 
-## 5. Safe integration sequence
+The local Ad/Tracker master switch and domain allow-list are persisted settings only. A future implementation must choose a DNS blocklist source, honor its license, parse its actual supported syntax (not assume every entry is a hosts-file line), define allow-list precedence, cap memory/storage, refresh safely and provide attribution/update behavior.
 
-1. Finish source/dependency/license inventory for the pinned revision.
-2. Extract the packet engine and its JNI contract into Vianshield without adding a second VPN service.
-3. Add a Vianshield runtime adapter that owns TUN descriptor lifetime, protect callbacks, start/stop serialization, foreground service state and fail-closed errors.
-4. Add and test WireGuard bridge build/runtime integration separately from packet engine integration.
-5. Adapt tracker analysis, domain evidence, usage and country attribution to Vianshield's storage/logging and UI.
-6. Connect the Tracker tab to real data only after evidence is being collected by the runtime.
-7. Verify app blocking, direct routing, DNS filtering, WireGuard routing, reboot/restart, network changes, descriptor cleanup and Android versions on device.
+## 6. Native and Gradle build inventory
 
-Until these steps are complete, the Vianshield engine-neutral VPN shell remains intentionally unprotected and the Tracker tab remains a placeholder.
+Vianshield builds the C packet-engine sources from the pinned submodule through `app/CMakeLists.txt`. Rust/Cargo and `cargo-ndk` build the ABI-specific GotaTun `libwgbridge.so`, then CMake links the JNI packet engine against it for the DNS C ABI.
+
+The current Vianshield application is configured for ARMv7 and ARM64. It does not copy TrackerControl's application ID, manifest, launcher, theme or full Gradle configuration.
+
+## 7. Licensing work still required
+
+- TrackerControl-derived code is GPL-3.0 and the repository includes a top-level GPL-3.0 license and third-party notices.
+- Keep upstream copyright/license headers in copied source; mark adapted files.
+- Audit the Rust crate dependencies, native dependencies, AndroidX/Gradle dependencies, fonts, icons, images, hostlists, tracker feeds, signatures and GeoIP data separately.
+- Record source, license, redistribution conditions, attribution and update mechanism before bundling any data asset/feed.
+
+## 8. Required validation
+
+On physical devices and supported Android versions:
+
+- Blocked app cannot use IPv4, IPv6, TCP, UDP or DNS; already-open sessions are terminated after Block is applied.
+- Allowed app retains internet access in local firewall-only mode.
+- Direct/VPN routing works for shared UIDs and respects WireGuard AllowedIPs.
+- DNS provider selection and local DNS filtering have distinct verified behavior.
+- WireGuard handshake and app traffic work; network handover recovers without leakage.
+- VPN revoke, process stop, reboot, repeated start/stop/reconfigure and descriptor cleanup work.
+- Foreground service, battery/background behavior and Android version-specific UID attribution are verified.
+
+A green compile/APK build is necessary but not sufficient evidence of runtime protection.

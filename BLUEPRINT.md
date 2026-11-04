@@ -1,109 +1,142 @@
-# Vianshield — Standalone Preparation Blueprint
+# Vianshield Architecture Blueprint
 
-## 1. Current Direction
+Status: development branch `refactor/engine-neutral-purge`
 
-Vianshield is being prepared as a standalone Android firewall/VPN application first. Once its TrackerControl-based runtime and user-facing features are validated on a real device, the proven feature will be integrated into Sidebar.
+This document records the current standalone architecture and the boundary for a later Sidebar integration. It distinguishes implemented behavior from planned work.
 
-The final Sidebar architecture is planned around:
-- Sidebar Main process owning the VPN service, tunnel lifecycle, enforcement runtime and authoritative protection state.
-- Sidebar Heavy process hosting the Vianshield settings UI and tracker presentation.
-- Existing Sidebar Binder IPC/recovery infrastructure connecting the two processes.
-- One Android VPN service/TUN owner.
+## 1. Product boundary
 
-The standalone stage is a validation vehicle. It is not a commitment to retain a separate published app or its current package identity.
+Vianshield is a lightweight Android firewall with optional WireGuard transport. Local app policy and remote VPN routing are separate decisions:
 
-## 2. Selected Runtime Direction
+1. The firewall decides whether an app/UID may pass.
+2. If permitted, the routing layer decides whether traffic goes directly to the physical network or through WireGuard.
 
-- Remove the existing Sing-box integration.
-- Use TrackerControl as the selected networking/firewall foundation, subject to source audit and deliberate extraction.
-- Preserve Vianshield's own UI, theme, feature presentation and existing logging experience.
-- Do not run Sing-box and TrackerControl as competing VPN engines.
-- Keep engine-specific implementation details behind a Vianshield runtime boundary.
-- Do not claim protection is active until the selected runtime and TUN are confirmed running.
-- Until the new runtime is integrated, VPN start requests fail closed and report that protection is unavailable.
+A WireGuard profile is optional for local firewall-only operation.
 
-TrackerControl is an Android application rather than a ready-made Android library. Its services, resources, native code, storage, preferences and runtime dependencies require an incremental extraction/adaptation plan.
+## 2. Runtime ownership
 
-## 3. Current Standalone Preparation Phase
+`VianshieldVpnService` is the sole Android `VpnService` and sole owner of the Android TUN descriptor.
 
-### Completed in the engine-neutral purge branch
-- [x] Create a working branch from the inspected main baseline.
-- [x] Remove Sing-box adapter, engine contract and storage manager.
-- [x] Remove Sing-box JSON generation from the WireGuard profile parser.
-- [x] Preserve WireGuard parsing, validation, profile redaction and import support.
-- [x] Remove the synthetic default WireGuard test profile from normal app state.
-- [x] Refactor Android VpnService shell to fail closed while no engine is installed.
-- [x] Remove Sing-box-specific UI, diagnostics and log-export claims.
-- [x] Replace the native Sing-box CI build with the existing Gradle test/APK pipeline.
-- [x] Remove obsolete Sing-box-specific tests and retain parser/logging/ViewModel tests.
+```text
+Main / Firewall / VPN / Settings UI
+                |
+       DiagnosticViewModel
+                |
+       VpnLifecycleController
+                |
+       VianshieldVpnService
+          |             |
+          |             +---- optional WgEgress (GotaTun / libwgbridge.so)
+          |
+          +---- ServiceSinkhole JNI facade
+                         |
+                  libnetguard.so
+                         |
+                  TUN packet loop
+```
 
-### TrackerControl import bootstrap
-- [x] Confirm GPL-3.0 licensing and user approval for GPL-3.0 distribution.
-- [x] Pin upstream TrackerControl source as a Git submodule for reproducible source audit.
-- [x] Preserve upstream GPL-3.0 license text and add third-party attribution notes.
-- [x] Configure CI checkout to initialize the pinned submodule.
-- [ ] Audit native build, service, packet loop, data/storage, tracker datasets and all nested third-party licenses.
-- [ ] Extract and adapt the runtime behind Vianshield's existing single VPN service; do not compile a second VPN service.
+Important ownership rules:
 
-### Remaining verification
-- [ ] Run the GitHub Actions unit-test and APK workflow on this branch.
-- [ ] Fix compilation/test issues revealed by CI.
-- [ ] Review the diff for stale engine references and unintended feature removal.
-- [ ] Verify APK artifact and both configured ARM ABIs.
-- [ ] Confirm on a physical Android device that the app truthfully remains unprotected until a runtime is integrated.
-- [ ] Audit current TrackerControl source and licensing before extraction.
+- `ServiceSinkhole` is a plain Java JNI facade, not an Android Service.
+- The TUN descriptor remains owned by `VianshieldVpnService`; the native loop borrows its FD and is stopped/joined before the descriptor is closed.
+- WireGuard is an optional userspace egress behind the same TUN. It does not establish a second Android VPN.
+- Lifecycle work is serialized on a dedicated single-thread executor.
+- Startup failures and native packet-loop failures transition the UI to an error/stopped state; Connected is not inferred from VPN permission alone.
+- Local firewall mode starts the native packet loop without WireGuard. WireGuard mode starts the same packet loop plus the GotaTun tunnel.
 
-## 4. Preserve Existing Vianshield Work
+## 3. App policy and routing
 
-Keep and adapt:
-- The Vianshield visual system and five primary tabs: Main, Firewall, VPN, Tracker and Settings. Tracker currently remains a placeholder.
-- WireGuard .conf parsing, validation, redacted profile previews and import support.
-- Android VPN permission/lifecycle shell and foreground notification infrastructure.
-- Operational Log Catcher, Log Keeper, Crash Reporter and Log Exporter.
-- Existing tests for parser, logging, crash reporting, log export and UI/ViewModel behavior.
-- Existing Gradle/Android build configuration and dual-ARM ABI filters unless TrackerControl native requirements prove a change necessary.
+The native packet engine asks the Vianshield callback for the UID's firewall decision.
 
-Do not treat UI placeholders as implemented enforcement. The existing firewall rules, DNS/ad-filter settings and speed presets currently include UI/state-only behavior and must be connected to real runtime enforcement in later phases.
+Current policy:
 
-Do not include speed throttling in the initial TrackerControl import.
+| Condition | Decision |
+|---|---|
+| Vianshield's own UID | Allow self |
+| UID is unavailable/invalid | Deny (unknown UID) |
+| No packages resolve and UID is below 2000 | Allow as an unowned Android system UID |
+| No packages resolve and UID is in app range | Deny |
+| Any package sharing the UID is Block | Block |
+| Every package sharing the UID explicitly selects Direct | Allow and route Direct |
+| Otherwise | Allow through the firewall's default route |
 
-## 5. Feature Integration Plan
+Direct UIDs are supplied to the native route table. With WireGuard configured, default routing is through WireGuard and Direct UIDs bypass that tunnel. Without WireGuard, allowed traffic follows the local/direct path through the native engine.
 
-1. TrackerControl source audit: enumerate exact firewall rules, app inventory, tracker lists, company attribution, categories, DNS behavior, country details, logging, WireGuard bridge, native dependencies and license obligations.
-2. Runtime extraction: adapt the smallest maintainable set of TrackerControl components behind the Vianshield runtime boundary. Preserve a single VpnService/TUN owner.
-3. Firewall and routing: connect per-app Block / Direct / WireGuard routing to actual enforcement. Direct traffic must still pass through the local firewall; no Android VPN bypass for Direct.
-4. Tracker experience: add the Tracker section and source-supported app detail views for Trackers, Data and Country.
-5. Logging: connect TrackerControl runtime events to the existing Log Catcher and Log Keeper without creating competing collectors/stores.
-6. Validation: test blocking, routing, DNS/tracker detection, WireGuard, fail-closed behavior, recovery, network transitions, reboot and resource use on a real device.
-7. Sidebar integration: move runtime ownership into Sidebar Main and the Vianshield UI into Sidebar Heavy using existing IPC/recovery patterns.
-8. Later extension: assess per-app upload/download speed limits after the firewall/tracker baseline is proven.
+A native policy-refresh signal causes existing TCP/UDP sessions to be rechecked after per-app rules change. This is important because changing a rule must not leave an older connection operating under a stale allow decision.
 
-## 6. APK Build Pipeline
+### App inventory
 
-The standalone repository's GitHub Actions workflow remains the build path:
-- Set up JDK 17 and Gradle.
-- Run :app:testDebugUnitTest.
-- Run :app:assembleDebug.
-- Stage and verify a non-empty APK outside Gradle-managed output directories.
-- Upload the debug APK artifact.
+The Firewall screen loads installed applications and icons through Android PackageManager. The manifest includes `QUERY_ALL_PACKAGES` for the user-facing inventory. User apps and system apps are shown as mutually exclusive views.
 
-The old Sing-box Go/gomobile/NDK/libbox compilation and AAR verification steps are removed. The Gradle ABI filters remain dual-ARM (armeabi-v7a and arm64-v8a). When TrackerControl's native components are introduced, add only their actual required native build steps and verify the resulting APK ABI contents.
+### Rule persistence
 
-## 7. Important Product Constraints
+BLOCK/VPN/DIRECT plus the per-app speed-exception and screen-aware values are stored in app-private preferences. BLOCK and routing modes are consumed by the current packet policy. Speed-exception and screen-aware values are saved but not yet enforced.
 
-- No false Connected/Protected state.
-- No silent fallback from a failed WireGuard route to Direct.
-- One VPN service/TUN owner.
-- Main process is authoritative after Sidebar integration; Heavy process must not own VPN lifecycle.
-- Heavy UI process exit must not stop VPN protection.
-- No telemetry; local processing by default.
-- Keep cryptographic keys and credentials redacted in logs/exports.
-- Domain allowlist exceptions apply to ad filtering only; firewall block rules still take precedence.
-- Speed throttling is deferred.
-- Historical receipts documenting the former Sing-box implementation are retained as history, not as current architecture.
+## 4. WireGuard profiles and DNS
 
-## 8. Current Branch
+WireGuard profiles are encrypted as an AES-GCM blob, with a non-exportable AES key held by Android Keystore. The encrypted preferences file is excluded from Android cloud backup and device transfer because the key cannot be restored independently.
 
-Working branch: refactor/engine-neutral-purge
+Import, edit, selection and reset persist first, then update the ViewModel. When the VPN is running, profile changes request a reconfiguration of the existing Vianshield service/TUN.
 
-Main remains the baseline until the purge branch passes CI, review and the user approves merging.
+DNS provider choices are persisted in `FirewallSettingsRepository`. The selected resolver list is passed to Android's VPN Builder. A provider change while the VPN is active restarts the same runtime so the TUN DNS list changes. The current resolver choices include profile default, Cloudflare, Quad9, Google and AdGuard DNS.
+
+## 5. Logging and privacy
+
+- Operational lifecycle/configuration failures are logged through OperationalLogCatcher.
+- Per-packet destination addresses/ports and DNS names are not persisted by the Vianshield packet callbacks.
+- DNS/resource records and per-app usage are not currently persisted into a Tracker evidence store.
+- Log Catcher is the operational logger/storage component. Log Keeper is the UI that displays, exports and clears those logs.
+- Crash reporting and log export remain separate from packet-policy enforcement.
+
+## 6. Current feature status
+
+| Feature | Current state |
+|---|---|
+| Native firewall packet loop | Integrated behind VianshieldVpnService; device validation pending |
+| Firewall-only mode | Implemented in service path; device validation pending |
+| WireGuard egress | GotaTun bridge integrated; handshake/runtime device validation pending |
+| Per-app Block | Implemented in callback policy; native policy refresh added; device validation pending |
+| Per-app VPN/Direct | Native per-UID route table integrated; device validation pending |
+| DNS resolver selection | Persisted and applied through TUN DNS server list |
+| Local Ad/Tracker domain filtering | Not active; domain-block callback currently returns false |
+| Domain allow-list | Persisted only; not yet connected to local DNS blocking |
+| Tracker intelligence / usage / country attribution | Not active; Tracker tab placeholder |
+| Global speed preset | Persisted only; no bandwidth cap applied |
+| Per-app speed exceptions | Persisted only; not enforced |
+| Screen-aware rule | Persisted only; not enforced |
+
+Do not describe a persisted preference as active traffic enforcement.
+
+## 7. Sidebar integration boundary
+
+Standalone Vianshield must be validated first. The planned Sidebar split is:
+
+- Sidebar Main/lightweight process owns and maintains the firewall runtime.
+- Sidebar Heavy owns the firewall UI/settings page.
+- Heavy closing must not stop the VPN or destroy the runtime.
+- Settings must communicate with the Main-owned runtime through an explicit process-safe IPC/state boundary; Heavy must not create a second TUN or second VPN service.
+
+This Sidebar architecture is a target design, not implemented in the current standalone branch.
+
+## 8. Validation checklist before release / Sidebar integration
+
+Run on physical Android devices and supported Android versions:
+
+- [ ] Local firewall starts without a WireGuard profile.
+- [ ] Blocked app loses IPv4, IPv6, TCP, UDP and DNS access, including an already-open connection when the rule is changed.
+- [ ] Allowed app retains internet access in firewall-only mode.
+- [ ] Direct app bypasses WireGuard only when all packages sharing its UID are Direct.
+- [ ] VPN-mode app is carried through WireGuard when a profile is active.
+- [ ] Split-tunnel AllowedIPs behavior matches the imported profile.
+- [ ] DNS resolver choice changes the TUN resolver list and traffic reaches the intended server.
+- [ ] WireGuard endpoint hostname resolution and tunnel handshake work.
+- [ ] Wi-Fi/mobile changes recover without leaking ordinary traffic.
+- [ ] VPN revoke, app force-stop, process recreation and device reboot cleanly recover/stop.
+- [ ] Repeated start/stop/reconfigure does not leak FDs, threads or native contexts.
+- [ ] Android versions below and above API 29 attribute UIDs correctly.
+- [ ] Battery/background behavior and foreground notification are correct.
+- [ ] Build/CI and APK install/launch are verified separately from live traffic behavior.
+
+## 9. Licensing / dependency audit
+
+TrackerControl-derived code is GPL-3.0. The pinned upstream source is a reference for the packet engine, JNI and WireGuard adapter. Keep upstream notices in modified/copied files and continue auditing all nested Rust crates, native dependencies, Gradle libraries, fonts/icons/images, tracker datasets, hostlists and GeoIP data individually.
