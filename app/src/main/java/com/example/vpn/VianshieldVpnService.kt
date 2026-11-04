@@ -371,8 +371,8 @@ class VianshieldVpnService : VpnService() {
         val directUids = currentDirectUids()
         engine.setWireGuardRoute(
             directUids,
-            defaultTunnel = useWireGuard,
-            dnsDirect = directUids.isNotEmpty()
+            useWireGuard,
+            directUids.isNotEmpty()
         )
     }
 
