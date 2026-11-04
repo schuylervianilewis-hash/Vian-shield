@@ -46,6 +46,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -450,116 +451,127 @@ fun MainScreen(
                 }
             )
 
-            // 2. Speed-Throttling Preset
-            DashboardControlRow(
-                icon = Icons.Default.Speed,
-                title = "Speed-Throttling Preset",
-                value = speedPreset,
-                statusTag = "Limiter Inactive",
-                onClick = { showSpeedDialog = true },
-                testTag = "main_speed_preset_row"
-            )
-
-            // 3. DNS Changer
-            DashboardControlRow(
-                icon = Icons.Default.Dns,
-                title = "DNS Changer",
-                value = dnsProvider,
-                statusTag = "Selected",
-                onClick = { showDnsDialog = true },
-                testTag = "main_dns_changer_row"
-            )
-
-            // 4. Ad Filter
+            // Compact secondary controls grouped into one surface.
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(14.dp),
                 colors = CardDefaults.cardColors(containerColor = SkyBlueSurface),
                 border = androidx.compose.foundation.BorderStroke(1.dp, SkyBlueSurfaceBorder)
             ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(14.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
+                Column {
+                    DashboardControlRow(
+                        icon = Icons.Default.Speed,
+                        title = "Speed-Throttling Preset",
+                        value = speedPreset,
+                        statusTag = "Limiter Inactive",
+                        onClick = { showSpeedDialog = true },
+                        testTag = "main_speed_preset_row"
+                    )
+
+                    HorizontalDivider(
+                        color = SkyBlueSurfaceBorder,
+                        modifier = Modifier.padding(horizontal = 14.dp)
+                    )
+
+                    DashboardControlRow(
+                        icon = Icons.Default.Dns,
+                        title = "DNS Changer",
+                        value = dnsProvider,
+                        statusTag = "Selected",
+                        onClick = { showDnsDialog = true },
+                        testTag = "main_dns_changer_row"
+                    )
+
+                    HorizontalDivider(
+                        color = SkyBlueSurfaceBorder,
+                        modifier = Modifier.padding(horizontal = 14.dp)
+                    )
+
                     Row(
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp, vertical = 12.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .size(36.dp)
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(
-                                    if (isAdFilterEnabled) SkyBluePrimaryContainer else SkyBlueSurfaceVariant
-                                ),
-                            contentAlignment = Alignment.Center
+                        Row(
+                            modifier = Modifier.weight(1f),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.Block,
-                                contentDescription = null,
-                                tint = if (isAdFilterEnabled) SkyBluePrimary else SkyBlueTextTertiary,
-                                modifier = Modifier.size(20.dp)
-                            )
-                        }
-
-                        Spacer(modifier = Modifier.width(12.dp))
-
-                        Column {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(
-                                    text = "Ad & Tracker Filter",
-                                    fontWeight = FontWeight.SemiBold,
-                                    fontSize = 14.sp,
-                                    color = SkyBlueTextPrimary
+                            Box(
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(
+                                        if (isAdFilterEnabled) SkyBluePrimaryContainer else SkyBlueSurfaceVariant
+                                    ),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Block,
+                                    contentDescription = null,
+                                    tint = if (isAdFilterEnabled) SkyBluePrimary else SkyBlueTextTertiary,
+                                    modifier = Modifier.size(20.dp)
                                 )
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Surface(
-                                    shape = RoundedCornerShape(6.dp),
-                                    color = SkyBlueSurfaceVariant
-                                ) {
-                                    Text(
-                                        text = "Rules Staged",
-                                        fontSize = 10.sp,
-                                        fontWeight = FontWeight.Medium,
-                                        color = SkyBlueTextTertiary,
-                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                                    )
-                                }
                             }
-                            Text(
-                                text = if (isAdFilterEnabled) "Local sinkhole enabled (Phase 2)" else "Drop ad & telemetry domains",
-                                fontSize = 11.sp,
-                                color = if (isAdFilterEnabled) StatusConnected else SkyBlueTextSecondary
-                            )
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Column {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(
+                                        text = "Ad & Tracker Filter",
+                                        fontWeight = FontWeight.SemiBold,
+                                        fontSize = 14.sp,
+                                        color = SkyBlueTextPrimary
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Surface(
+                                        shape = RoundedCornerShape(6.dp),
+                                        color = SkyBlueSurfaceVariant
+                                    ) {
+                                        Text(
+                                            text = "Rules Staged",
+                                            fontSize = 10.sp,
+                                            fontWeight = FontWeight.Medium,
+                                            color = SkyBlueTextTertiary,
+                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                        )
+                                    }
+                                }
+                                Text(
+                                    text = if (isAdFilterEnabled) "Enabled · filtering not active yet" else "Ad & tracker rules are staged",
+                                    fontSize = 11.sp,
+                                    color = SkyBlueTextSecondary
+                                )
+                            }
                         }
+                        Switch(
+                            checked = isAdFilterEnabled,
+                            onCheckedChange = { viewModel.setAdFilterEnabled(it) },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = Color.White,
+                                checkedTrackColor = SkyBluePrimary,
+                                uncheckedThumbColor = Color.White,
+                                uncheckedTrackColor = SkyBlueSurfaceBorder
+                            ),
+                            modifier = Modifier.testTag("main_ad_filter_switch")
+                        )
                     }
 
-                    Switch(
-                        checked = isAdFilterEnabled,
-                        onCheckedChange = { viewModel.setAdFilterEnabled(it) },
-                        colors = SwitchDefaults.colors(
-                            checkedThumbColor = Color.White,
-                            checkedTrackColor = SkyBluePrimary,
-                            uncheckedThumbColor = Color.White,
-                            uncheckedTrackColor = SkyBlueSurfaceBorder
-                        ),
-                        modifier = Modifier.testTag("main_ad_filter_switch")
+                    HorizontalDivider(
+                        color = SkyBlueSurfaceBorder,
+                        modifier = Modifier.padding(horizontal = 14.dp)
+                    )
+
+                    DashboardControlRow(
+                        icon = Icons.Default.Security,
+                        title = "Ad-Filter Allow-List",
+                        value = "${adFilterAllowList.size} domains whitelisted",
+                        statusTag = "Manage",
+                        onClick = { showAllowListDialog = true },
+                        testTag = "main_ad_allowlist_row"
                     )
                 }
             }
-
-            // 5. Ad-Filter Allow-List
-            DashboardControlRow(
-                icon = Icons.Default.Security,
-                title = "Ad-Filter Allow-List",
-                value = "${adFilterAllowList.size} domains whitelisted",
-                statusTag = "Manage",
-                onClick = { showAllowListDialog = true },
-                testTag = "main_ad_allowlist_row"
-            )
 
             // 6. Actual Protection Status and Relevant Errors
             ConnectionStatusCard(
@@ -629,79 +641,68 @@ private fun DashboardControlRow(
     onClick: () -> Unit,
     testTag: String
 ) {
-    Card(
+    Row(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
-            .testTag(testTag),
-        shape = RoundedCornerShape(14.dp),
-        colors = CardDefaults.cardColors(containerColor = SkyBlueSurface),
-        border = androidx.compose.foundation.BorderStroke(1.dp, SkyBlueSurfaceBorder)
+            .testTag(testTag)
+            .padding(horizontal = 12.dp, vertical = 12.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
     ) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(14.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
+            modifier = Modifier.weight(1f),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Row(
-                modifier = Modifier.weight(1f),
-                verticalAlignment = Alignment.CenterVertically
+            Box(
+                modifier = Modifier
+                    .size(36.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(SkyBluePrimaryContainer),
+                contentAlignment = Alignment.Center
             ) {
-                Box(
-                    modifier = Modifier
-                        .size(36.dp)
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(SkyBluePrimaryContainer),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = icon,
-                        contentDescription = null,
-                        tint = SkyBlueOnPrimaryContainer,
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
-
-                Spacer(modifier = Modifier.width(12.dp))
-
-                Column {
-                    Text(
-                        text = title,
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 14.sp,
-                        color = SkyBlueTextPrimary
-                    )
-                    Text(
-                        text = value,
-                        fontSize = 12.sp,
-                        color = SkyBlueTextSecondary
-                    )
-                }
-            }
-
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Surface(
-                    shape = RoundedCornerShape(6.dp),
-                    color = SkyBlueSurfaceVariant,
-                    modifier = Modifier.padding(end = 6.dp)
-                ) {
-                    Text(
-                        text = statusTag,
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = SkyBlueTextTertiary,
-                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                    )
-                }
                 Icon(
-                    imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                    imageVector = icon,
                     contentDescription = null,
-                    tint = SkyBlueTextTertiary,
-                    modifier = Modifier.size(16.dp)
+                    tint = SkyBlueOnPrimaryContainer,
+                    modifier = Modifier.size(20.dp)
                 )
             }
+            Spacer(modifier = Modifier.width(12.dp))
+            Column {
+                Text(
+                    text = title,
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 14.sp,
+                    color = SkyBlueTextPrimary
+                )
+                Text(
+                    text = value,
+                    fontSize = 12.sp,
+                    color = SkyBlueTextSecondary
+                )
+            }
+        }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Surface(
+                shape = RoundedCornerShape(6.dp),
+                color = SkyBlueSurfaceVariant,
+                modifier = Modifier.padding(end = 6.dp)
+            ) {
+                Text(
+                    text = statusTag,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = SkyBlueTextTertiary,
+                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                )
+            }
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                contentDescription = null,
+                tint = SkyBlueTextTertiary,
+                modifier = Modifier.size(16.dp)
+            )
         }
     }
 }
