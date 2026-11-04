@@ -123,8 +123,12 @@ fun ProfilesScreen(
         ImportProfileConfirmationDialog(
             profile = importedProfilePreview!!,
             onConfirm = {
-                viewModel.confirmImportedProfile()
-                Toast.makeText(context, "WireGuard profile applied and saved", Toast.LENGTH_SHORT).show()
+                val saved = viewModel.confirmImportedProfile()
+                Toast.makeText(
+                    context,
+                    if (saved) "WireGuard profile securely saved" else "Profile could not be saved securely",
+                    Toast.LENGTH_SHORT
+                ).show()
             },
             onDismiss = { viewModel.dismissImportDialog() }
         )
@@ -204,8 +208,12 @@ fun ProfilesScreen(
                     }
                     IconButton(
                         onClick = {
-                            viewModel.resetToDefaultConfig()
-                            Toast.makeText(context, "Reset to default profile", Toast.LENGTH_SHORT).show()
+                            val reset = viewModel.resetToDefaultConfig()
+                            Toast.makeText(
+                                context,
+                                if (reset) "Active profile cleared" else "Could not save profile selection",
+                                Toast.LENGTH_SHORT
+                            ).show()
                         },
                         modifier = Modifier.testTag("profiles_reset_button")
                     ) {
@@ -292,7 +300,11 @@ fun ProfilesScreen(
                     item = item,
                     isSelected = isSelected,
                     isExpanded = isExpanded,
-                    onSelect = { viewModel.selectSavedProfile(item) },
+                    onSelect = {
+                        if (!viewModel.selectSavedProfile(item)) {
+                            Toast.makeText(context, "Could not securely save profile selection", Toast.LENGTH_SHORT).show()
+                        }
+                    },
                     onToggleExpand = {
                         expandedProfileId = if (isExpanded) null else item.id
                     }
@@ -349,9 +361,13 @@ fun ProfilesScreen(
                                     onClick = {
                                         val parseCheck = WireGuardConfigParser.parse(rawEditorText)
                                         if (parseCheck.isSuccess) {
-                                            viewModel.updateConfig(rawEditorText)
-                                            showRawEditor = false
-                                            Toast.makeText(context, "Config applied", Toast.LENGTH_SHORT).show()
+                                            val saved = viewModel.updateConfig(rawEditorText)
+                                            if (saved) {
+                                                showRawEditor = false
+                                                Toast.makeText(context, "Config encrypted and saved", Toast.LENGTH_SHORT).show()
+                                            } else {
+                                                Toast.makeText(context, "Could not securely save config", Toast.LENGTH_LONG).show()
+                                            }
                                         } else {
                                             Toast.makeText(
                                                 context,

@@ -51,6 +51,9 @@ class DiagnosticViewModel(application: Application) : AndroidViewModel(applicati
 
     private val lifecycleController = VpnLifecycleController(application)
     private val appFirewallRuleRepository = AppFirewallRuleRepository(application)
+    private val wireGuardProfileRepository = WireGuardProfileRepository(application)
+    private val restoredProfileSnapshot = wireGuardProfileRepository.load()
+    private var activeProfileId: String? = restoredProfileSnapshot.selectedProfileId
 
     val appFirewallRules: StateFlow<Map<String, AppFirewallRule>> = appFirewallRuleRepository.rules
 
@@ -76,7 +79,12 @@ class DiagnosticViewModel(application: Application) : AndroidViewModel(applicati
     private val _sortNewestFirst = MutableStateFlow(true)
     val sortNewestFirst: StateFlow<Boolean> = _sortNewestFirst.asStateFlow()
 
-    private val _currentConfig = MutableStateFlow("")
+    private val _currentConfig = MutableStateFlow(
+        restoredProfileSnapshot.profiles
+            .firstOrNull { it.id == activeProfileId }
+            ?.rawConfig
+            .orEmpty()
+    )
     val currentConfig: StateFlow<String> = _currentConfig.asStateFlow()
 
     val activeProfile: StateFlow<WireGuardProfile?> = _currentConfig.map { conf ->
@@ -122,8 +130,18 @@ class DiagnosticViewModel(application: Application) : AndroidViewModel(applicati
         val isDefault: Boolean = false
     )
 
-    private val _savedProfiles = MutableStateFlow<List<SavedProfileItem>>(emptyList())
+    private val _savedProfiles = MutableStateFlow(restoredProfileSnapshot.profiles)
     val savedProfiles: StateFlow<List<SavedProfileItem>> = _savedProfiles.asStateFlow()
+
+    init {
+        if (restoredProfileSnapshot.error != null) {
+            OperationalLogCatcher.warn(
+                LogCategory.CONFIG_VALIDATION,
+                "WireGuardProfileRepository",
+                "Saved profiles could not be restored from encrypted storage."
+            )
+        }
+    }
 
     // Bounded and filtered events stream for Log Keeper UI
     val filteredLogEvents: StateFlow<List<LogEvent>> = combine(
@@ -192,17 +210,62 @@ class DiagnosticViewModel(application: Application) : AndroidViewModel(applicati
         appFirewallRuleRepository.saveAll(rules)
     }
 
-    fun updateConfig(newConfig: String) {
+    fun updateConfig(newConfig: String): Boolean {
+        val profile = WireGuardConfigParser.parse(newConfig).getOrElse { error ->
+            _importError.value = error.message ?: "WireGuard profile validation failed."
+            return false
+        }
+        val currentProfiles = _savedProfiles.value
+        val activeIndex = currentProfiles.indexOfFirst { it.id == activeProfileId }
+        val item = if (activeIndex >= 0) {
+            currentProfiles[activeIndex].copy(
+                name = profile.name,
+                endpoint = "${profile.endpointHost}:${profile.endpointPort}",
+                rawConfig = newConfig
+            )
+        } else {
+            SavedProfileItem(
+                id = "profile_${System.currentTimeMillis()}",
+                name = profile.name,
+                endpoint = "${profile.endpointHost}:${profile.endpointPort}",
+                rawConfig = newConfig
+            )
+        }
+        val updatedProfiles = if (activeIndex >= 0) {
+            currentProfiles.toMutableList().also { it[activeIndex] = item }
+        } else {
+            currentProfiles + item
+        }
+        val saveResult = wireGuardProfileRepository.save(updatedProfiles, item.id)
+        if (saveResult.isFailure) {
+            _importError.value = "Could not securely save the edited profile: ${saveResult.exceptionOrNull()?.message}"
+            return false
+        }
+        _savedProfiles.value = updatedProfiles
+        activeProfileId = item.id
         _currentConfig.value = newConfig
+        _importError.value = null
+        return true
     }
 
-    fun resetToDefaultConfig() {
+    fun resetToDefaultConfig(): Boolean {
+        val saveResult = wireGuardProfileRepository.save(_savedProfiles.value, null)
+        if (saveResult.isFailure) {
+            OperationalLogCatcher.error(
+                LogCategory.CONFIG_VALIDATION,
+                "WireGuardProfileRepository",
+                "Could not persist the cleared active profile selection."
+            )
+            return false
+        }
+        activeProfileId = null
         _currentConfig.value = ""
         OperationalLogCatcher.info(
             LogCategory.CONFIG_VALIDATION,
             "DiagnosticViewModel",
-            "Cleared active WireGuard profile"
+            "Cleared active WireGuard profile selection"
         )
+        return true
     }
 
     fun checkPermissionIntent(): Intent? {
@@ -290,28 +353,37 @@ class DiagnosticViewModel(application: Application) : AndroidViewModel(applicati
         }
     }
 
-    fun confirmImportedProfile() {
+    fun confirmImportedProfile(): Boolean {
         val raw = pendingImportedRawConfig
         val profile = _importedProfilePreview.value
-        if (raw != null && profile != null) {
-            _currentConfig.value = raw
-            val newSavedItem = SavedProfileItem(
-                id = "profile_${System.currentTimeMillis()}",
-                name = profile.name,
-                endpoint = "${profile.endpointHost}:${profile.endpointPort}",
-                rawConfig = raw,
-                isDefault = false
-            )
-            _savedProfiles.value = _savedProfiles.value + newSavedItem
-            OperationalLogCatcher.info(
-                LogCategory.CONFIG_VALIDATION,
-                "DiagnosticViewModel",
-                "Successfully imported and applied profile: ${profile.toRedactedSummary()}"
-            )
+        if (raw == null || profile == null) return false
+
+        val newSavedItem = SavedProfileItem(
+            id = "profile_${System.currentTimeMillis()}",
+            name = profile.name,
+            endpoint = "${profile.endpointHost}:${profile.endpointPort}",
+            rawConfig = raw,
+            isDefault = false
+        )
+        val updatedProfiles = _savedProfiles.value + newSavedItem
+        val saveResult = wireGuardProfileRepository.save(updatedProfiles, newSavedItem.id)
+        if (saveResult.isFailure) {
+            _importError.value = "Profile validated, but encrypted storage failed: ${saveResult.exceptionOrNull()?.message}"
+            return false
         }
+
+        _savedProfiles.value = updatedProfiles
+        activeProfileId = newSavedItem.id
+        _currentConfig.value = raw
+        OperationalLogCatcher.info(
+            LogCategory.CONFIG_VALIDATION,
+            "DiagnosticViewModel",
+            "Successfully imported and encrypted profile: ${profile.toRedactedSummary()}"
+        )
         _importedProfilePreview.value = null
         _importError.value = null
         pendingImportedRawConfig = null
+        return true
     }
 
     fun setSpeedPreset(preset: String) {
@@ -352,13 +424,24 @@ class DiagnosticViewModel(application: Application) : AndroidViewModel(applicati
         _adFilterAllowList.value = _adFilterAllowList.value.filter { it != domain }
     }
 
-    fun selectSavedProfile(item: SavedProfileItem) {
+    fun selectSavedProfile(item: SavedProfileItem): Boolean {
+        val saveResult = wireGuardProfileRepository.save(_savedProfiles.value, item.id)
+        if (saveResult.isFailure) {
+            OperationalLogCatcher.error(
+                LogCategory.CONFIG_VALIDATION,
+                "WireGuardProfileRepository",
+                "Could not persist the selected WireGuard profile."
+            )
+            return false
+        }
+        activeProfileId = item.id
         _currentConfig.value = item.rawConfig
         OperationalLogCatcher.info(
             LogCategory.CONFIG_VALIDATION,
             "DiagnosticViewModel",
             "Selected active profile: ${item.name} (${item.endpoint})"
         )
+        return true
     }
 
     fun dismissImportDialog() {
