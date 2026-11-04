@@ -14,6 +14,7 @@ import com.example.ui.AppFirewallRuleRepository
 import com.example.ui.FirewallMode
 import com.example.ui.DiagnosticViewModel
 import com.example.ui.TimeFilter
+import com.example.vpn.PacketPolicy
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
