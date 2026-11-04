@@ -55,7 +55,7 @@ class DiagnosticViewModel(application: Application) : AndroidViewModel(applicati
     private val firewallSettingsRepository = FirewallSettingsRepository(application)
     private val restoredFirewallSettings = firewallSettingsRepository.load()
     private val restoredProfileSnapshot = wireGuardProfileRepository.load()
-    private val __activeProfileId.value = MutableStateFlow(restoredProfileSnapshot.selectedProfileId)
+    private val _activeProfileId = MutableStateFlow(restoredProfileSnapshot.selectedProfileId)
 
     val appFirewallRules: StateFlow<Map<String, AppFirewallRule>> = appFirewallRuleRepository.rules
 
