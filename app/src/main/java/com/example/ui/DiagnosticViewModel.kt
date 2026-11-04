@@ -89,10 +89,6 @@ class DiagnosticViewModel(application: Application) : AndroidViewModel(applicati
     )
     val currentConfig: StateFlow<String> = _currentConfig.asStateFlow()
 
-    val activeProfile: StateFlow<WireGuardProfile?> = _currentConfig.map { conf ->
-        if (conf.isBlank()) null else WireGuardConfigParser.parse(conf).getOrNull()
-    }.stateIn(viewModelScope, SharingStarted.Eagerly, null)
-
     private val _importedProfilePreview = MutableStateFlow<WireGuardProfile?>(null)
     val importedProfilePreview: StateFlow<WireGuardProfile?> = _importedProfilePreview.asStateFlow()
 
@@ -134,6 +130,19 @@ class DiagnosticViewModel(application: Application) : AndroidViewModel(applicati
 
     private val _savedProfiles = MutableStateFlow(restoredProfileSnapshot.profiles)
     val savedProfiles: StateFlow<List<SavedProfileItem>> = _savedProfiles.asStateFlow()
+
+    val activeProfile: StateFlow<WireGuardProfile?> = combine(
+        _currentConfig,
+        _savedProfiles
+    ) { conf, profiles ->
+        if (conf.isBlank()) {
+            null
+        } else {
+            val selectedName = profiles.firstOrNull { it.id == activeProfileId }?.name
+                ?: "Default Profile"
+            WireGuardConfigParser.parse(conf, selectedName).getOrNull()
+        }
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
     init {
         if (restoredProfileSnapshot.error != null) {
