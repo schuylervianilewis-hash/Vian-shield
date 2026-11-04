@@ -445,7 +445,8 @@ private fun AppFirewallRow(
     onScreenAwareToggled: (Boolean) -> Unit
 ) {
 
-    val context = LocalContext.current    Card(
+    val context = LocalContext.current
+    Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(containerColor = SkyBlueSurface),
