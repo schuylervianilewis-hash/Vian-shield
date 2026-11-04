@@ -55,7 +55,7 @@ class DiagnosticViewModel(application: Application) : AndroidViewModel(applicati
     private val firewallSettingsRepository = FirewallSettingsRepository(application)
     private val restoredFirewallSettings = firewallSettingsRepository.load()
     private val restoredProfileSnapshot = wireGuardProfileRepository.load()
-    private var activeProfileId: String? = restoredProfileSnapshot.selectedProfileId
+    private val __activeProfileId.value = MutableStateFlow(restoredProfileSnapshot.selectedProfileId)
 
     val appFirewallRules: StateFlow<Map<String, AppFirewallRule>> = appFirewallRuleRepository.rules
 
@@ -83,7 +83,7 @@ class DiagnosticViewModel(application: Application) : AndroidViewModel(applicati
 
     private val _currentConfig = MutableStateFlow(
         restoredProfileSnapshot.profiles
-            .firstOrNull { it.id == activeProfileId }
+            .firstOrNull { it.id == _activeProfileId.value }
             ?.rawConfig
             .orEmpty()
     )
@@ -133,12 +133,13 @@ class DiagnosticViewModel(application: Application) : AndroidViewModel(applicati
 
     val activeProfile: StateFlow<WireGuardProfile?> = combine(
         _currentConfig,
-        _savedProfiles
-    ) { conf, profiles ->
+        _savedProfiles,
+        _activeProfileId
+    ) { conf, profiles, selectedProfileId ->
         if (conf.isBlank()) {
             null
         } else {
-            val selectedName = profiles.firstOrNull { it.id == activeProfileId }?.name
+            val selectedName = profiles.firstOrNull { it.id == selectedProfileId }?.name
                 ?: "Default Profile"
             WireGuardConfigParser.parse(conf, selectedName).getOrNull()
         }
@@ -225,7 +226,7 @@ class DiagnosticViewModel(application: Application) : AndroidViewModel(applicati
 
     fun updateConfig(newConfig: String): Boolean {
         val currentProfiles = _savedProfiles.value
-        val activeIndex = currentProfiles.indexOfFirst { it.id == activeProfileId }
+        val activeIndex = currentProfiles.indexOfFirst { it.id == _activeProfileId.value }
         val existingProfileName = currentProfiles.getOrNull(activeIndex)?.name ?: "Default Profile"
         val profile = WireGuardConfigParser.parse(newConfig, existingProfileName).getOrElse { error ->
             _importError.value = error.message ?: "WireGuard profile validation failed."
@@ -256,7 +257,7 @@ class DiagnosticViewModel(application: Application) : AndroidViewModel(applicati
             return false
         }
         _savedProfiles.value = updatedProfiles
-        activeProfileId = item.id
+        _activeProfileId.value = item.id
         _currentConfig.value = newConfig
         _importError.value = null
         VianshieldVpnService.reconfigureIfRunning(getApplication(), newConfig)
@@ -273,7 +274,7 @@ class DiagnosticViewModel(application: Application) : AndroidViewModel(applicati
             )
             return false
         }
-        activeProfileId = null
+        _activeProfileId.value = null
         _currentConfig.value = ""
         VianshieldVpnService.reconfigureIfRunning(getApplication(), "")
         OperationalLogCatcher.info(
@@ -389,7 +390,7 @@ class DiagnosticViewModel(application: Application) : AndroidViewModel(applicati
         }
 
         _savedProfiles.value = updatedProfiles
-        activeProfileId = newSavedItem.id
+        _activeProfileId.value = newSavedItem.id
         _currentConfig.value = raw
         VianshieldVpnService.reconfigureIfRunning(getApplication(), raw)
         OperationalLogCatcher.info(
@@ -456,7 +457,7 @@ class DiagnosticViewModel(application: Application) : AndroidViewModel(applicati
             )
             return false
         }
-        activeProfileId = item.id
+        _activeProfileId.value = item.id
         _currentConfig.value = item.rawConfig
         VianshieldVpnService.reconfigureIfRunning(getApplication(), item.rawConfig)
         OperationalLogCatcher.info(
