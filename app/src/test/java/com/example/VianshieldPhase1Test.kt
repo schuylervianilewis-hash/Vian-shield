@@ -360,4 +360,57 @@ class VianshieldPhase1Test {
         assertTrue(repository.rules.value["com.example.two"]?.screenAwareRule == true)
     }
 
+    @Test
+    fun packetPolicy_deniesUnknownUidAndUnsupportedDirectMode() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        context.getSharedPreferences("vianshield_firewall_rules_v1", Context.MODE_PRIVATE)
+            .edit().clear().commit()
+        val rules = AppFirewallRuleRepository(context)
+
+        assertEquals(
+            PacketPolicy.Decision.UNKNOWN_UID,
+            PacketPolicy.decide(12345, 99999, arrayOf("com.unknown.app"), rules)
+        )
+
+        rules.save(AppFirewallRule("com.direct.app", FirewallMode.DIRECT))
+        assertEquals(
+            PacketPolicy.Decision.DIRECT_NOT_READY,
+            PacketPolicy.decide(12345, 99999, arrayOf("com.direct.app"), rules)
+        )
+    }
+
+    @Test
+    fun packetPolicy_blocksIfAnyPackageSharingUidIsBlocked() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        context.getSharedPreferences("vianshield_firewall_rules_v1", Context.MODE_PRIVATE)
+            .edit().clear().commit()
+        val rules = AppFirewallRuleRepository(context)
+        rules.save(AppFirewallRule("com.allowed.app", FirewallMode.VPN))
+        rules.save(AppFirewallRule("com.blocked.app", FirewallMode.BLOCK))
+
+        assertEquals(
+            PacketPolicy.Decision.BLOCK,
+            PacketPolicy.decide(
+                12345, 99999,
+                arrayOf("com.allowed.app", "com.blocked.app"),
+                rules
+            )
+        )
+    }
+
+    @Test
+    fun packetPolicy_allowsSelfAndConfiguredVpnAppOnly() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        context.getSharedPreferences("vianshield_firewall_rules_v1", Context.MODE_PRIVATE)
+            .edit().clear().commit()
+        val rules = AppFirewallRuleRepository(context)
+        rules.save(AppFirewallRule("com.vpn.app", FirewallMode.VPN))
+
+        assertEquals(PacketPolicy.Decision.SELF, PacketPolicy.decide(99999, 99999, null, rules))
+        assertEquals(
+            PacketPolicy.Decision.ALLOW_VPN,
+            PacketPolicy.decide(12345, 99999, arrayOf("com.vpn.app"), rules)
+        )
+    }
+
 }
