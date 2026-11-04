@@ -25,13 +25,18 @@ internal object PacketPolicy {
 
         val appRules = packageNames.mapNotNull(rules::getRule)
         if (appRules.any { it.mode == FirewallMode.BLOCK }) return Decision.BLOCK
+        return if (shouldRouteDirect(packageNames, rules)) Decision.ALLOW_DIRECT else Decision.ALLOW_VPN
+    }
 
-        val everyPackageExplicitlyDirect = appRules.isNotEmpty() &&
-            packageNames.all { packageName ->
-                rules.getRule(packageName)?.mode == FirewallMode.DIRECT
-            }
-        if (everyPackageExplicitlyDirect) return Decision.ALLOW_DIRECT
-
-        return Decision.ALLOW_VPN
+    /**
+     * Android may assign multiple packages to one UID. A UID is routed direct
+     * only when every package sharing it explicitly selects Direct. One
+     * blocked package is still handled by decide() before routing.
+     */
+    fun shouldRouteDirect(
+        packageNames: Array<String>?,
+        rules: AppFirewallRuleRepository
+    ): Boolean = !packageNames.isNullOrEmpty() && packageNames.all { packageName ->
+        rules.getRule(packageName)?.mode == FirewallMode.DIRECT
     }
 }

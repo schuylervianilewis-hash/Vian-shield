@@ -384,15 +384,14 @@ class VianshieldPhase1Test {
         )
 
         rules.save(AppFirewallRule("com.vpn.shared", FirewallMode.VPN))
+        val mixedPackages = arrayOf("com.direct.app", "com.vpn.shared")
+        assertFalse(PacketPolicy.shouldRouteDirect(mixedPackages, rules))
         assertEquals(
             PacketPolicy.Decision.ALLOW_VPN,
-            PacketPolicy.decide(
-                12345,
-                99999,
-                arrayOf("com.direct.app", "com.vpn.shared"),
-                rules
-            )
+            PacketPolicy.decide(12345, 99999, mixedPackages, rules)
         )
+        assertTrue(PacketPolicy.shouldRouteDirect(arrayOf("com.direct.app"), rules))
+        assertFalse(PacketPolicy.shouldRouteDirect(null, rules))
     }
 
     @Test

@@ -20,7 +20,6 @@ import com.example.config.WireGuardProfile
 import com.example.logging.LogCategory
 import com.example.logging.OperationalLogCatcher
 import com.example.ui.AppFirewallRuleRepository
-import com.example.ui.FirewallMode
 import eu.faircode.netguard.ServiceSinkhole
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -334,18 +333,19 @@ class VianshieldVpnService : VpnService() {
     }
 
     private fun currentDirectUids(): IntArray {
-        val directPackages = appFirewallRules.rules.value.values
-            .filter { it.mode == FirewallMode.DIRECT }
-            .map { it.packageName }
-            .toHashSet()
-        if (directPackages.isEmpty()) return intArrayOf()
+        if (appFirewallRules.rules.value.values.none { it.mode == com.example.ui.FirewallMode.DIRECT }) {
+            return intArrayOf()
+        }
 
         return try {
             packageManager.getInstalledApplications(0)
                 .asSequence()
-                .filter { it.packageName in directPackages }
                 .map { it.uid }
                 .distinct()
+                .filter { uid ->
+                    val packages = packageManager.getPackagesForUid(uid)
+                    PacketPolicy.shouldRouteDirect(packages, appFirewallRules)
+                }
                 .toList()
                 .toIntArray()
         } catch (error: Exception) {

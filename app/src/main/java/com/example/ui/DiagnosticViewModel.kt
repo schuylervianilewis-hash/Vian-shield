@@ -213,12 +213,13 @@ class DiagnosticViewModel(application: Application) : AndroidViewModel(applicati
     }
 
     fun updateConfig(newConfig: String): Boolean {
-        val profile = WireGuardConfigParser.parse(newConfig).getOrElse { error ->
+        val currentProfiles = _savedProfiles.value
+        val activeIndex = currentProfiles.indexOfFirst { it.id == activeProfileId }
+        val existingProfileName = currentProfiles.getOrNull(activeIndex)?.name ?: "Default Profile"
+        val profile = WireGuardConfigParser.parse(newConfig, existingProfileName).getOrElse { error ->
             _importError.value = error.message ?: "WireGuard profile validation failed."
             return false
         }
-        val currentProfiles = _savedProfiles.value
-        val activeIndex = currentProfiles.indexOfFirst { it.id == activeProfileId }
         val item = if (activeIndex >= 0) {
             currentProfiles[activeIndex].copy(
                 name = profile.name,
