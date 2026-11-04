@@ -362,7 +362,7 @@ class VianshieldPhase1Test {
     }
 
     @Test
-    fun packetPolicy_deniesUnknownUidAndUnsupportedDirectMode() {
+    fun packetPolicy_defaultsKnownAppsToFirewallAndSupportsExplicitDirect() {
         val context = ApplicationProvider.getApplicationContext<Context>()
         context.getSharedPreferences("vianshield_firewall_rules_v1", Context.MODE_PRIVATE)
             .edit().clear().commit()
@@ -370,13 +370,28 @@ class VianshieldPhase1Test {
 
         assertEquals(
             PacketPolicy.Decision.UNKNOWN_UID,
+            PacketPolicy.decide(-1, 99999, arrayOf("com.unknown.app"), rules)
+        )
+        assertEquals(
+            PacketPolicy.Decision.ALLOW_VPN,
             PacketPolicy.decide(12345, 99999, arrayOf("com.unknown.app"), rules)
         )
 
         rules.save(AppFirewallRule("com.direct.app", FirewallMode.DIRECT))
         assertEquals(
-            PacketPolicy.Decision.DIRECT_NOT_READY,
+            PacketPolicy.Decision.ALLOW_DIRECT,
             PacketPolicy.decide(12345, 99999, arrayOf("com.direct.app"), rules)
+        )
+
+        rules.save(AppFirewallRule("com.vpn.shared", FirewallMode.VPN))
+        assertEquals(
+            PacketPolicy.Decision.ALLOW_VPN,
+            PacketPolicy.decide(
+                12345,
+                99999,
+                arrayOf("com.direct.app", "com.vpn.shared"),
+                rules
+            )
         )
     }
 
