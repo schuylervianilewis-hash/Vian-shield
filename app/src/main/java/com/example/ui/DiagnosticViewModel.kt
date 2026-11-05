@@ -2,9 +2,7 @@ package com.example.ui
 
 import android.app.Application
 import android.content.Context
-import android.content.Intent
 import android.net.Uri
-import androidx.activity.result.ActivityResultLauncher
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.config.WireGuardConfigParser
@@ -15,8 +13,6 @@ import com.example.logging.LogSeverity
 import com.example.logging.OperationalLogCatcher
 import com.example.logging.CrashReporter
 import com.example.logging.LogExporter
-import com.example.vpn.VianshieldVpnService
-import com.example.vpn.VpnLifecycleController
 import com.example.vpn.VpnState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -45,9 +41,7 @@ enum class TimeFilter(val label: String, val durationMs: Long?) {
 
 class DiagnosticViewModel(application: Application) : AndroidViewModel(application) {
 
-    private val lifecycleController = VpnLifecycleController(application)
-
-    val vpnState: StateFlow<VpnState> = VianshieldVpnService.vpnState
+    val vpnState: StateFlow<VpnState> = MutableStateFlow(VpnState.RuntimePending)
     val rawLogEvents = OperationalLogCatcher.events
     val isLoggingEnabled = OperationalLogCatcher.isLoggingEnabled
 
@@ -204,22 +198,12 @@ class DiagnosticViewModel(application: Application) : AndroidViewModel(applicati
         )
     }
 
-    fun checkPermissionIntent(): Intent? {
-        return lifecycleController.checkVpnPermission()
-    }
-
-    fun toggleVpn(permissionLauncher: ActivityResultLauncher<Intent>? = null) {
-        when (vpnState.value) {
-            is VpnState.Connected, is VpnState.Starting -> {
-                lifecycleController.requestStopVpn()
-            }
-            is VpnState.Stopped, is VpnState.Error -> {
-                lifecycleController.requestStartVpn(_currentConfig.value, permissionLauncher)
-            }
-            is VpnState.Stopping -> {
-                // Ignore while stopping to prevent conflicting lifecycle states
-            }
-        }
+    fun toggleVpn() {
+        OperationalLogCatcher.info(
+            LogCategory.VPN_LIFECYCLE,
+            "DiagnosticViewModel",
+            "Firewall runtime integration is pending; no VPN service was started."
+        )
     }
 
     fun setLoggingEnabled(enabled: Boolean) {

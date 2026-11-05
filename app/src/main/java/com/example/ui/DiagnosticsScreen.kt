@@ -51,11 +51,8 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.engine.SingBoxAdapter
 import com.example.ui.theme.SkyBlueBackground
-import com.example.ui.theme.SkyBlueOnPrimaryContainer
 import com.example.ui.theme.SkyBluePrimary
-import com.example.ui.theme.SkyBluePrimaryContainer
 import com.example.ui.theme.SkyBlueSurface
 import com.example.ui.theme.SkyBlueSurfaceBorder
 import com.example.ui.theme.SkyBlueSurfaceVariant
@@ -79,7 +76,6 @@ fun DiagnosticsScreen(
     BackHandler { onBack() }
 
     val vpnState by viewModel.vpnState.collectAsState()
-    val isNativeAvailable = SingBoxAdapter.isNativeAvailable()
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
@@ -129,7 +125,7 @@ fun DiagnosticsScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // Engine Core Status
+            // Honest engine-neutral state while the runtime is not integrated
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(14.dp),
@@ -137,42 +133,16 @@ fun DiagnosticsScreen(
                 border = androidx.compose.foundation.BorderStroke(1.dp, SkyBlueSurfaceBorder)
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "Engine Runtime State",
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 15.sp,
-                            color = SkyBlueTextPrimary
-                        )
-                        Surface(
-                            shape = RoundedCornerShape(6.dp),
-                            color = if (isNativeAvailable) SkyBluePrimaryContainer else Color(0xFFFEF3C7)
-                        ) {
-                            Text(
-                                text = if (isNativeAvailable) "libbox Native" else "SFA Lifecycle Bridge",
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = if (isNativeAvailable) SkyBlueOnPrimaryContainer else Color(0xFF92400E),
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
-                            )
-                        }
-                    }
-
+                    Text(
+                        text = "Runtime Integration",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 15.sp,
+                        color = SkyBlueTextPrimary
+                    )
                     Spacer(modifier = Modifier.height(12.dp))
-
-                    DiagnosticRow("Pinned Engine Version", "sing-box v1.14.4")
-                    DiagnosticRow("Native libbox.aar Presence", if (isNativeAvailable) "Loaded & Verified (SFA f87c2eb)" else "Pending CI AAR build")
-                    DiagnosticRow("Integration Architecture", "SFA / BitProxy Command-Client Lifecycle")
-                    DiagnosticRow("Userspace Network Stack", "gVisor (non-root Android userspace)")
-                    DiagnosticRow("Socket Loop Protection", "VpnService.protect(fd) enforced")
-                    DiagnosticRow("Sandbox Storage Paths", "filesDir / cacheDir (App-Private)")
-                    DiagnosticRow("Config Validation", "Verified via Libbox.checkConfig")
-                    DiagnosticRow("Lifecycle Serialization", "Mutex protected with 10s watchdog")
-                    DiagnosticRow("Teardown Ordering", "BoxService.stop() -> TUN close")
+                    DiagnosticRow("Firewall runtime", "Not integrated")
+                    DiagnosticRow("Protection state", "Pending — no active firewall protection")
+                    DiagnosticRow("WireGuard profiles", "Profile management is available; tunnel runtime is pending")
                 }
             }
 
@@ -185,7 +155,7 @@ fun DiagnosticsScreen(
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text(
-                        text = "VpnService State Details",
+                        text = "Runtime State Details",
                         fontWeight = FontWeight.Bold,
                         fontSize = 15.sp,
                         color = SkyBlueTextPrimary
@@ -199,6 +169,7 @@ fun DiagnosticsScreen(
                         is VpnState.Stopping -> Pair(StatusStarting, "Stopping")
                         is VpnState.Error -> Pair(StatusError, "Error")
                         is VpnState.Stopped -> Pair(StatusStopped, "Stopped")
+                        is VpnState.RuntimePending -> Pair(StatusStarting, "Integration pending")
                     }
 
                     Row(verticalAlignment = Alignment.CenterVertically) {

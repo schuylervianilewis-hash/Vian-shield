@@ -1,6 +1,5 @@
 package com.example.config
 
-import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -229,74 +228,6 @@ class WireGuardConfigParserTest {
     }
 
     @Test
-    fun toSingBoxJson_producesVerifiedSchema() {
-        val conf = WireGuardConfigParser.createDefaultTestConfig()
-        val profile = WireGuardConfigParser.parse(conf).getOrThrow()
-        val jsonStr = WireGuardConfigParser.toSingBoxJson(profile)
-
-        val root = JSONObject(jsonStr)
-
-        // Verify route
-        val route = root.getJSONObject("route")
-        assertTrue("route.auto_detect_interface must be true", route.getBoolean("auto_detect_interface"))
-        assertEquals("wg-out", route.getString("final"))
-        val rules = route.getJSONArray("rules")
-        assertTrue("rules must contain at least 2 rules", rules.length() >= 2)
-        assertEquals("dns", rules.getJSONObject(0).getString("protocol"))
-        assertEquals("dns-out", rules.getJSONObject(0).getString("outbound"))
-
-        // Verify inbounds
-        val inbounds = root.getJSONArray("inbounds")
-        val tun = inbounds.getJSONObject(0)
-        assertEquals("gvisor", tun.getString("stack"))
-        assertEquals("vianshield-tun", tun.getString("interface_name"))
-        assertTrue("inbounds must contain address array", tun.has("address"))
-        assertEquals(profile.address, tun.getJSONArray("address").getString(0))
-
-        // Verify outbounds
-        val outbounds = root.getJSONArray("outbounds")
-        val dnsOut = outbounds.getJSONObject(0)
-        assertEquals("dns", dnsOut.getString("type"))
-        assertEquals("dns-out", dnsOut.getString("tag"))
-
-        // Verify endpoints (modern sing-box v1.11.0 WireGuard schema with keepalive support)
-        assertTrue("root must contain endpoints array", root.has("endpoints"))
-        val endpoints = root.getJSONArray("endpoints")
-        val wg = endpoints.getJSONObject(0)
-        assertEquals("wireguard", wg.getString("type"))
-        assertEquals("wg-out", wg.getString("tag"))
-        assertEquals(profile.privateKey, wg.getString("private_key"))
-        val peer = wg.getJSONArray("peers").getJSONObject(0)
-        assertEquals(profile.endpointHost, peer.getString("address"))
-        assertEquals(profile.endpointPort, peer.getInt("port"))
-        assertEquals(profile.peerPublicKey, peer.getString("public_key"))
-
-        // Verify DNS detour
-        val dns = root.getJSONObject("dns")
-        val dnsServers = dns.getJSONArray("servers")
-        assertTrue(dnsServers.length() > 0)
-        assertEquals("wg-out", dnsServers.getJSONObject(0).getString("detour"))
-
-        // Verify experimental cache_file configuration is eliminated in v1.14.4
-        assertFalse("In sing-box v1.14.4, experimental.cache_file is eliminated", root.has("experimental"))
-    }
-
-    @Test
-    fun toSingBoxJson_eliminatesCacheFileWorkaround() {
-        val conf = WireGuardConfigParser.createDefaultTestConfig()
-        val profile = WireGuardConfigParser.parse(conf).getOrThrow()
-        val jsonStr = WireGuardConfigParser.toSingBoxJson(profile)
-
-        val root = JSONObject(jsonStr)
-        assertFalse("v1.14.4 JSON schema must not contain experimental object", root.has("experimental"))
-        assertTrue("Must contain valid log object", root.has("log"))
-        assertTrue("Must contain inbounds", root.has("inbounds"))
-        assertTrue("Must contain endpoints", root.has("endpoints"))
-        assertTrue("Must contain outbounds", root.has("outbounds"))
-        assertTrue("Must contain route", root.has("route"))
-    }
-
-    @Test
     fun parse_multiAddress_ipv4AndIpv6_succeeds() {
         val conf = """
             [Interface]
@@ -316,16 +247,10 @@ class WireGuardConfigParserTest {
         assertEquals("1.1.1.1", profile.dns)
         assertEquals(listOf("1.1.1.1", "8.8.8.8"), profile.dnsServers)
 
-        // Verify JSON includes both addresses
-        val json = JSONObject(WireGuardConfigParser.toSingBoxJson(profile))
-        val tunAddresses = json.getJSONArray("inbounds").getJSONObject(0).getJSONArray("address")
-        assertEquals(2, tunAddresses.length())
-        assertEquals("10.0.0.2/24", tunAddresses.getString(0))
-        assertEquals("fd00::2/64", tunAddresses.getString(1))
     }
 
     @Test
-    fun parse_persistentKeepalive_succeedsAndIncludedInJson() {
+    fun parse_persistentKeepalive_succeeds() {
         val conf = """
             [Interface]
             PrivateKey = $validPrivateKey
@@ -341,12 +266,6 @@ class WireGuardConfigParserTest {
         val profile = result.getOrThrow()
         assertEquals(25, profile.persistentKeepalive)
 
-        val json = JSONObject(WireGuardConfigParser.toSingBoxJson(profile))
-        val endpoints = json.getJSONArray("endpoints")
-        val wgEndpoint = endpoints.getJSONObject(0)
-        val peer = wgEndpoint.getJSONArray("peers").getJSONObject(0)
-        assertTrue("WireGuard peer must contain persistent_keepalive_interval", peer.has("persistent_keepalive_interval"))
-        assertEquals(25, peer.getInt("persistent_keepalive_interval"))
     }
 
     @Test

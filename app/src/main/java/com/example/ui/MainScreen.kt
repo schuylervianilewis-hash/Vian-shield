@@ -1,8 +1,6 @@
 package com.example.ui
 
 import android.widget.Toast
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -80,7 +78,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.engine.SingBoxAdapter
 import com.example.ui.theme.SkyBlueBackground
 import com.example.ui.theme.SkyBlueOnPrimaryContainer
 import com.example.ui.theme.SkyBluePrimary
@@ -115,16 +112,6 @@ fun MainScreen(
     var showSpeedDialog by remember { mutableStateOf(false) }
     var showDnsDialog by remember { mutableStateOf(false) }
     var showAllowListDialog by remember { mutableStateOf(false) }
-
-    val vpnPermissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.StartActivityForResult()
-    ) { result ->
-        if (result.resultCode == android.app.Activity.RESULT_OK) {
-            viewModel.toggleVpn()
-        } else {
-            Toast.makeText(context, "VPN permission is required to create network tunnel", Toast.LENGTH_LONG).show()
-        }
-    }
 
     // Speed Preset Selection Dialog
     if (showSpeedDialog) {
@@ -402,7 +389,7 @@ fun MainScreen(
                             modifier = Modifier.padding(vertical = 2.dp)
                         ) {
                             Text(
-                                text = "sing-box v1.11.0",
+                                text = "Runtime Pending",
                                 color = SkyBlueOnPrimaryContainer,
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.SemiBold,
@@ -722,9 +709,10 @@ private fun PrimaryActionButton(
     val (statusLabel, statusTag) = when {
         vpnState is VpnState.Starting -> "CONNECTING" to "Negotiating"
         vpnState is VpnState.Stopping -> "DISCONNECTING" to "Teardown"
-        isConnected -> "WIREGUARD ACTIVE" to "Protected"
+        isConnected -> "FIREWALL ACTIVE" to "Protected"
         vpnState is VpnState.Error -> "PROTECTION ERROR" to "Failed"
-        else -> "WIREGUARD OFF" to "Standby"
+        vpnState is VpnState.RuntimePending -> "FIREWALL PENDING" to "Integration pending"
+        else -> "FIREWALL OFF" to "Standby"
     }
 
     val subtitle = when {
@@ -735,8 +723,9 @@ private fun PrimaryActionButton(
             "Tunneling through $endpoint"
         }
         vpnState is VpnState.Starting -> "Establishing secure UDP tunnel..."
-        vpnState is VpnState.Stopping -> "Stopping sing-box engine..."
+        vpnState is VpnState.Stopping -> "Stopping VPN tunnel..."
         vpnState is VpnState.Error -> "Failed to establish tunnel"
+        vpnState is VpnState.RuntimePending -> "Firewall runtime integration is pending. No protection is active."
         else -> "Tap power button to connect"
     }
 
@@ -984,14 +973,11 @@ private fun ConnectionStatusCard(
                         modifier = Modifier
                             .size(6.dp)
                             .clip(CircleShape)
-                            .background(if (SingBoxAdapter.isNativeAvailable()) StatusConnected else StatusStarting)
+                            .background(StatusStarting)
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
-                        text = if (SingBoxAdapter.isNativeAvailable())
-                            "libbox Native Core Linked"
-                        else
-                            "Native Core Bridge Pending",
+                        text = "Firewall runtime integration pending",
                         fontSize = 10.sp,
                         color = SkyBlueTextSecondary,
                         fontWeight = FontWeight.Medium

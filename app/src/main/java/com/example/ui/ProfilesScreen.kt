@@ -388,6 +388,7 @@ private fun VpnHealthStatusCard(
         is VpnState.Stopping -> Triple(StatusStarting, "Stopping...", Icons.Default.HourglassEmpty)
         is VpnState.Error -> Triple(StatusError, "Tunnel Error", Icons.Default.Error)
         is VpnState.Stopped -> Triple(StatusStopped, "Disconnected", Icons.Default.Stop)
+        is VpnState.RuntimePending -> Triple(StatusStarting, "Runtime Pending", Icons.Default.HourglassEmpty)
     }
 
     Card(
@@ -429,7 +430,8 @@ private fun VpnHealthStatusCard(
                             text = when (vpnState) {
                                 is VpnState.Connected -> "Encrypted UDP userspace tunnel active"
                                 is VpnState.Error -> vpnState.message
-                                else -> "sing-box v1.11.0 ready"
+                                is VpnState.RuntimePending -> "WireGuard runtime integration is pending"
+                                else -> "Disconnected"
                             },
                             fontSize = 11.sp,
                             color = SkyBlueTextSecondary

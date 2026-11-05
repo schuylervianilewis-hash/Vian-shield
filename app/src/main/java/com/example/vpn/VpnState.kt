@@ -1,6 +1,7 @@
 package com.example.vpn
 
 sealed class VpnState {
+    data object RuntimePending : VpnState()
     data object Stopped : VpnState()
     data class Starting(val stage: String) : VpnState()
     data class Connected(

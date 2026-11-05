@@ -3,9 +3,6 @@ package com.example
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import com.example.config.WireGuardConfigParser
-import com.example.engine.SingBoxAdapter
-import com.example.engine.SingBoxPlatformCallback
-import com.example.engine.SingBoxStorageManager
 import com.example.logging.CrashReporter
 import com.example.logging.LogCategory
 import com.example.logging.LogExporter
@@ -14,9 +11,9 @@ import com.example.logging.OperationalLogCatcher
 import com.example.ui.AppScreen
 import com.example.ui.DiagnosticViewModel
 import com.example.ui.TimeFilter
+import com.example.vpn.VpnState
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
-import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -63,35 +60,6 @@ class VianshieldPhase1Test {
         assertEquals("203.0.113.5", profile.endpointHost)
         assertEquals(51820, profile.endpointPort)
         assertEquals("1.1.1.1", profile.dns)
-    }
-
-    @Test
-    fun wireguardConfigParser_generatesValidSingBoxJson() {
-        val conf = WireGuardConfigParser.createDefaultTestConfig()
-        val profile = WireGuardConfigParser.parse(conf).getOrThrow()
-        val jsonString = WireGuardConfigParser.toSingBoxJson(profile)
-
-        val root = JSONObject(jsonString)
-        assertTrue(root.has("log"))
-        assertTrue(root.has("dns"))
-        assertTrue(root.has("inbounds"))
-        assertTrue(root.has("endpoints"))
-        assertTrue(root.has("outbounds"))
-        assertTrue(root.has("route"))
-        assertFalse("In sing-box v1.14.4, experimental.cache_file is eliminated", root.has("experimental"))
-
-        val inbounds = root.getJSONArray("inbounds")
-        val tun = inbounds.getJSONObject(0)
-        assertEquals("tun", tun.getString("type"))
-        assertEquals("vianshield-tun", tun.getString("interface_name"))
-
-        val endpoints = root.getJSONArray("endpoints")
-        val wg = endpoints.getJSONObject(0)
-        assertEquals("wireguard", wg.getString("type"))
-        assertEquals("wg-out", wg.getString("tag"))
-        val peer = wg.getJSONArray("peers").getJSONObject(0)
-        assertEquals(profile.endpointHost, peer.getString("address"))
-        assertEquals(profile.endpointPort, peer.getInt("port"))
     }
 
     @Test
@@ -155,75 +123,6 @@ class VianshieldPhase1Test {
     }
 
     @Test
-    fun singBoxAdapter_truthfullyFailsWhenNativeBinaryIsMissing() {
-        val realAdapter = SingBoxAdapter(allowSimulationForTesting = false)
-        assertFalse(realAdapter.isNativeBinaryAvailable())
-
-        val testProfile = WireGuardConfigParser.parse(WireGuardConfigParser.createDefaultTestConfig()).getOrThrow()
-        val json = WireGuardConfigParser.toSingBoxJson(testProfile)
-
-        val callback = object : SingBoxPlatformCallback {
-            override fun openTun(options: Any?): Int = -1
-            override fun autoDetectInterfaceControl(fd: Int): Boolean = false
-            override fun onLog(level: String, message: String) {}
-            override fun onError(code: String, message: String) {}
-        }
-
-        val result = realAdapter.initialize(json, callback)
-        assertTrue("Adapter must report failure when native libbox.aar is absent", result.isFailure)
-        assertTrue(result.exceptionOrNull()?.message?.contains("libbox.aar") == true)
-    }
-
-    @Test
-    fun singBoxAdapter_lifecycleSimulation() {
-        val adapter = SingBoxAdapter(allowSimulationForTesting = true)
-        assertEquals("sing-box v1.14.4", adapter.getEngineVersion())
-        assertFalse(adapter.isRunning())
-
-        val testProfile = WireGuardConfigParser.parse(WireGuardConfigParser.createDefaultTestConfig()).getOrThrow()
-        val json = WireGuardConfigParser.toSingBoxJson(testProfile)
-
-        // Verify checkConfig passes
-        val checkRes = adapter.checkConfig(json)
-        assertTrue("checkConfig must succeed for valid configuration", checkRes.isSuccess)
-
-        val callback = object : SingBoxPlatformCallback {
-            override fun openTun(options: Any?): Int = 42
-            override fun autoDetectInterfaceControl(fd: Int): Boolean = true
-            override fun onLog(level: String, message: String) {}
-            override fun onError(code: String, message: String) {}
-        }
-
-        val initResult = adapter.initialize(json, callback)
-        assertTrue(initResult.isSuccess)
-
-        val startResult = adapter.start()
-        assertTrue(startResult.isSuccess)
-        assertTrue(adapter.isRunning())
-
-        // Test reload with valid config (BitProxy patch 0007)
-        val reloadResult = adapter.reload(json)
-        assertTrue("reload with valid config should succeed", reloadResult.isSuccess)
-
-        // Test reload with invalid config (must reject without changing running state)
-        val badJson = "{ \"invalid\": true }"
-        val badReloadResult = adapter.reload(badJson)
-        assertTrue("reload with bad config must fail", badReloadResult.isFailure)
-
-        val stopResult = adapter.stop()
-        assertTrue(stopResult.isSuccess)
-        assertFalse(adapter.isRunning())
-    }
-
-    @Test
-    fun singBoxStorageManager_setupEnvironment_registersDirectories() {
-        val context = ApplicationProvider.getApplicationContext<Context>()
-        val adapter = SingBoxAdapter(allowSimulationForTesting = true)
-        val setupResult = SingBoxStorageManager.setupEnvironment(context, adapter)
-        assertTrue("Environment setup must succeed", setupResult.isSuccess)
-    }
-
-    @Test
     fun diagnosticViewModel_navigationAcrossAllScreens() {
         val viewModel = DiagnosticViewModel(ApplicationProvider.getApplicationContext())
         assertEquals(AppScreen.MAIN, viewModel.currentScreen.value)
@@ -253,6 +152,9 @@ class VianshieldPhase1Test {
     @Test
     fun diagnosticViewModel_uiControlsStateManagement() {
         val viewModel = DiagnosticViewModel(ApplicationProvider.getApplicationContext())
+        assertTrue(viewModel.vpnState.value is VpnState.RuntimePending)
+        viewModel.toggleVpn()
+        assertTrue("VPN must remain pending when no runtime is integrated", viewModel.vpnState.value is VpnState.RuntimePending)
 
         // Speed preset
         assertEquals("Unlimited (Full Speed)", viewModel.speedPreset.value)
@@ -422,38 +324,5 @@ class VianshieldPhase1Test {
         assertEquals(0, viewModel.pendingCrashCount.value)
     }
 
-    @Test
-    fun singBoxStorageManager_sandboxDirectories_createdAndWritable() {
-        val context = ApplicationProvider.getApplicationContext<Context>()
-        val baseDir = SingBoxStorageManager.getBaseDir(context)
-        val workingDir = SingBoxStorageManager.getWorkingDir(context)
-        val tempDir = SingBoxStorageManager.getTempDir(context)
 
-        assertTrue("Base directory must exist", baseDir.exists())
-        assertTrue("Base directory must be writable", baseDir.canWrite())
-        assertTrue("Working directory must exist", workingDir.exists())
-        assertTrue("Temp directory must exist", tempDir.exists())
-    }
-
-    @Test
-    fun singBoxStorageManager_setupEnvironment_bootstrapsEngine() {
-        val context = ApplicationProvider.getApplicationContext<Context>()
-        val adapter = SingBoxAdapter(allowSimulationForTesting = true)
-        val result = SingBoxStorageManager.setupEnvironment(context, adapter)
-        assertTrue("setupEnvironment must succeed", result.isSuccess)
-    }
-
-    @Test
-    fun singBoxStorageManager_getSafeStorageDiagnostics_hasExpectedFields() {
-        val context = ApplicationProvider.getApplicationContext<Context>()
-        val diagnostics = SingBoxStorageManager.getSafeStorageDiagnostics(context)
-
-        assertTrue("Diagnostics must have Base Dir", diagnostics.containsKey("Base Dir"))
-        assertTrue("Diagnostics must have Working Dir", diagnostics.containsKey("Working Dir"))
-        assertTrue("Diagnostics must have Temp Dir", diagnostics.containsKey("Temp Dir"))
-        assertTrue("Diagnostics must have Directory Exists", diagnostics.containsKey("Directory Exists"))
-        assertTrue("Diagnostics must have Directory Writable", diagnostics.containsKey("Directory Writable"))
-        assertTrue("Diagnostics must have Storage Status", diagnostics.containsKey("Storage Status"))
-        assertTrue("Storage Status must indicate app-private storage", diagnostics["Storage Status"]?.contains("App-Private") == true)
-    }
 }
