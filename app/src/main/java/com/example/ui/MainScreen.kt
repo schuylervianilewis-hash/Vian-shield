@@ -425,14 +425,7 @@ fun MainScreen(
             PrimaryActionButton(
                 vpnState = vpnState,
                 activeProfile = activeProfile,
-                onToggle = {
-                    val intent = viewModel.checkPermissionIntent()
-                    if (intent != null) {
-                        vpnPermissionLauncher.launch(intent)
-                    } else {
-                        viewModel.toggleVpn()
-                    }
-                }
+                onToggle = { viewModel.toggleVpn() }
             )
 
             // 2. Speed-Throttling Preset
@@ -874,6 +867,7 @@ private fun ConnectionStatusCard(
         is VpnState.Stopping -> Triple(StatusStarting, "Stopping Tunnel...", Icons.Default.HourglassEmpty)
         is VpnState.Error -> Triple(StatusError, "Protection Error", Icons.Default.Error)
         is VpnState.Stopped -> Triple(StatusStopped, "Protection Inactive", Icons.Default.Stop)
+        is VpnState.RuntimePending -> Triple(StatusStarting, "Firewall Runtime Pending", Icons.Default.HourglassEmpty)
     }
 
     Card(
