@@ -73,20 +73,11 @@ import com.example.ui.theme.SkyBlueTextSecondary
 import com.example.ui.theme.SkyBlueTextTertiary
 import com.example.ui.theme.StatusError
 
-enum class FirewallMode(val label: String) {
-    BLOCK("Block"),
-    VPN("VPN"),
-    DIRECT("Direct")
-}
-
 data class AppFirewallItem(
     val packageName: String,
     val appName: String,
     val isSystemApp: Boolean,
-    val mode: FirewallMode = FirewallMode.VPN,
-    val isConfigured: Boolean = false,
-    val speedException: String = "Default",
-    val screenAwareRule: Boolean = false
+    val isConfigured: Boolean = false
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -291,16 +282,15 @@ fun FirewallScreen(
                             fontWeight = FontWeight.Medium,
                             color = SkyBlueTextTertiary
                         )
-                        MasterModeChip("Block", StatusError) {
+                        MasterModeChip("Block") {
                             showFirewallUnavailableToast(context, "Bulk Block rules")
                         }
-                        MasterModeChip("VPN", SkyBluePrimary) {
+                        MasterModeChip("VPN") {
                             showFirewallUnavailableToast(context, "Bulk VPN routing")
                         }
-                        MasterModeChip("Direct", Color(0xFF64748B)) {
+                        MasterModeChip("Direct") {
                             showFirewallUnavailableToast(context, "Bulk Direct routing")
                         }
-                    }
                     }
                 }
             }
@@ -602,20 +592,19 @@ private fun CompactModeButton(
 @Composable
 private fun MasterModeChip(
     label: String,
-    color: Color,
     onClick: () -> Unit
 ) {
     Surface(
         onClick = onClick,
         shape = RoundedCornerShape(6.dp),
-        color = color.copy(alpha = 0.12f),
-        border = androidx.compose.foundation.BorderStroke(1.dp, color.copy(alpha = 0.3f))
+        color = SkyBlueSurfaceVariant.copy(alpha = 0.55f),
+        border = androidx.compose.foundation.BorderStroke(1.dp, SkyBlueSurfaceBorder)
     ) {
         Text(
             text = label,
             fontSize = 10.sp,
-            fontWeight = FontWeight.Bold,
-            color = color,
+            fontWeight = FontWeight.Medium,
+            color = SkyBlueTextTertiary,
             modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
         )
     }
