@@ -1,6 +1,7 @@
 package com.example.ui
 
 import android.content.pm.ApplicationInfo
+import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
@@ -104,12 +105,10 @@ fun FirewallScreen(
     var showSystemApps by remember { mutableStateOf(false) }
     var expandedAppPackage by remember { mutableStateOf<String?>(null) }
 
-    // In-memory firewall rules map: packageName -> AppFirewallItem
-    var appRules by remember {
-        mutableStateOf<Map<String, AppFirewallItem>>(emptyMap())
-    }
+    var installedApps by remember { mutableStateOf<List<AppFirewallItem>>(emptyList()) }
+    var isLoadingApps by remember { mutableStateOf(true) }
 
-    // Load installed apps once
+    // Use only packages Android actually reports; never substitute sample/demo apps.
     LaunchedEffect(Unit) {
         val pm = context.packageManager
         val installed = try {
@@ -118,61 +117,36 @@ fun FirewallScreen(
             emptyList<ApplicationInfo>()
         }
 
-        val items = if (installed.isNotEmpty()) {
-            installed.map { appInfo ->
-                val label = try {
-                    pm.getApplicationLabel(appInfo).toString()
-                } catch (_: Exception) {
-                    appInfo.packageName
-                }
-                val isSystem = (appInfo.flags and ApplicationInfo.FLAG_SYSTEM) != 0
-                AppFirewallItem(
-                    packageName = appInfo.packageName,
-                    appName = if (label.isNotBlank()) label else appInfo.packageName,
-                    isSystemApp = isSystem,
-                    mode = FirewallMode.VPN,
-                    isConfigured = false
-                )
+        installedApps = installed.map { appInfo ->
+            val label = try {
+                pm.getApplicationLabel(appInfo).toString()
+            } catch (_: Exception) {
+                appInfo.packageName
             }
-        } else {
-            // Seed a representative list for testing or emulator environments
-            listOf(
-                AppFirewallItem("com.android.chrome", "Google Chrome", isSystemApp = false, mode = FirewallMode.VPN),
-                AppFirewallItem("org.mozilla.firefox", "Firefox Browser", isSystemApp = false, mode = FirewallMode.VPN),
-                AppFirewallItem("com.google.android.youtube", "YouTube", isSystemApp = false, mode = FirewallMode.VPN),
-                AppFirewallItem("com.spotify.music", "Spotify", isSystemApp = false, mode = FirewallMode.VPN),
-                AppFirewallItem("com.whatsapp", "WhatsApp", isSystemApp = false, mode = FirewallMode.VPN),
-                AppFirewallItem("com.twitter.android", "X (Twitter)", isSystemApp = false, mode = FirewallMode.VPN),
-                AppFirewallItem("com.google.android.gm", "Gmail", isSystemApp = true, mode = FirewallMode.VPN),
-                AppFirewallItem("com.google.android.apps.maps", "Google Maps", isSystemApp = true, mode = FirewallMode.VPN),
-                AppFirewallItem("com.android.settings", "System Settings", isSystemApp = true, mode = FirewallMode.DIRECT),
-                AppFirewallItem("com.android.vending", "Google Play Store", isSystemApp = true, mode = FirewallMode.VPN)
+            AppFirewallItem(
+                packageName = appInfo.packageName,
+                appName = if (label.isNotBlank()) label else appInfo.packageName,
+                isSystemApp = (appInfo.flags and ApplicationInfo.FLAG_SYSTEM) != 0,
+                isConfigured = false
             )
         }
-
-        appRules = items.associateBy { it.packageName }
+        isLoadingApps = false
     }
 
-    // Filter and Sort:
-    // 1. Filter by system app toggle
-    // 2. Filter by search query
-    // 3. Sort: Configured items first, then alphabetical by App Name
-    val displayedApps = appRules.values
+    // Search and system-app filtering operate only on the actual visible package list.
+    val displayedApps = installedApps
         .filter { item ->
             if (!showSystemApps && item.isSystemApp) false
-            else {
-                if (searchQuery.isBlank()) true
-                else item.appName.contains(searchQuery, ignoreCase = true) ||
-                        item.packageName.contains(searchQuery, ignoreCase = true)
-            }
+            else searchQuery.isBlank() ||
+                    item.appName.contains(searchQuery, ignoreCase = true) ||
+                    item.packageName.contains(searchQuery, ignoreCase = true)
         }
         .sortedWith(
             compareByDescending<AppFirewallItem> { it.isConfigured }
                 .thenBy { it.appName.lowercase() }
         )
 
-    val configuredCount = appRules.values.count { it.isConfigured }
-    val totalCount = appRules.size
+    val totalCount = installedApps.size
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
@@ -192,7 +166,7 @@ fun FirewallScreen(
                             color = SkyBluePrimaryContainer
                         ) {
                             Text(
-                                text = "$configuredCount/$totalCount Configured",
+                                text = "$totalCount apps",
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.SemiBold,
                                 color = SkyBlueOnPrimaryContainer,
@@ -306,7 +280,7 @@ fun FirewallScreen(
                         letterSpacing = 0.5.sp
                     )
 
-                    // Option B: Master selection to apply mode to all apps at once
+                    // Bulk policy shortcuts remain visible but cannot change rules yet.
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(4.dp)
@@ -317,39 +291,16 @@ fun FirewallScreen(
                             fontWeight = FontWeight.Medium,
                             color = SkyBlueTextTertiary
                         )
-                        MasterModeChip(
-                            label = "Block",
-                            color = StatusError,
-                            onClick = {
-                                val updated = appRules.toMutableMap()
-                                displayedApps.forEach { app ->
-                                    updated[app.packageName] = app.copy(mode = FirewallMode.BLOCK, isConfigured = true)
-                                }
-                                appRules = updated
-                            }
-                        )
-                        MasterModeChip(
-                            label = "VPN",
-                            color = SkyBluePrimary,
-                            onClick = {
-                                val updated = appRules.toMutableMap()
-                                displayedApps.forEach { app ->
-                                    updated[app.packageName] = app.copy(mode = FirewallMode.VPN, isConfigured = true)
-                                }
-                                appRules = updated
-                            }
-                        )
-                        MasterModeChip(
-                            label = "Direct",
-                            color = Color(0xFF64748B),
-                            onClick = {
-                                val updated = appRules.toMutableMap()
-                                displayedApps.forEach { app ->
-                                    updated[app.packageName] = app.copy(mode = FirewallMode.DIRECT, isConfigured = true)
-                                }
-                                appRules = updated
-                            }
-                        )
+                        MasterModeChip("Block", StatusError) {
+                            showFirewallUnavailableToast(context, "Bulk Block rules")
+                        }
+                        MasterModeChip("VPN", SkyBluePrimary) {
+                            showFirewallUnavailableToast(context, "Bulk VPN routing")
+                        }
+                        MasterModeChip("Direct", Color(0xFF64748B)) {
+                            showFirewallUnavailableToast(context, "Bulk Direct routing")
+                        }
+                    }
                     }
                 }
             }
@@ -364,7 +315,11 @@ fun FirewallScreen(
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = if (searchQuery.isNotBlank()) "No applications found matching '$searchQuery'" else "Loading applications...",
+                            text = when {
+                                searchQuery.isNotBlank() -> "No applications found matching '$searchQuery'"
+                                isLoadingApps -> "Loading installed applications..."
+                                else -> "No visible installed applications. Android package visibility may limit this list."
+                            },
                             color = SkyBlueTextSecondary,
                             fontSize = 13.sp
                         )
@@ -383,23 +338,8 @@ fun FirewallScreen(
                         onToggleExpand = {
                             expandedAppPackage = if (isExpanded) null else item.packageName
                         },
-                        onModeSelected = { newMode ->
-                            appRules = appRules + (item.packageName to item.copy(
-                                mode = newMode,
-                                isConfigured = true
-                            ))
-                        },
-                        onSpeedExceptionSelected = { exception ->
-                            appRules = appRules + (item.packageName to item.copy(
-                                speedException = exception,
-                                isConfigured = true
-                            ))
-                        },
-                        onScreenAwareToggled = { enabled ->
-                            appRules = appRules + (item.packageName to item.copy(
-                                screenAwareRule = enabled,
-                                isConfigured = true
-                            ))
+                        onUnavailable = { feature ->
+                            showFirewallUnavailableToast(context, feature)
                         }
                     )
                 }
@@ -412,14 +352,20 @@ fun FirewallScreen(
     }
 }
 
+private fun showFirewallUnavailableToast(context: android.content.Context, feature: String) {
+    Toast.makeText(
+        context,
+        "$feature is not available yet. Firewall rule storage and runtime enforcement are not integrated.",
+        Toast.LENGTH_SHORT
+    ).show()
+}
+
 @Composable
 private fun AppFirewallRow(
     item: AppFirewallItem,
     isExpanded: Boolean,
     onToggleExpand: () -> Unit,
-    onModeSelected: (FirewallMode) -> Unit,
-    onSpeedExceptionSelected: (String) -> Unit,
-    onScreenAwareToggled: (Boolean) -> Unit
+    onUnavailable: (String) -> Unit
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -447,23 +393,13 @@ private fun AppFirewallRow(
                         modifier = Modifier
                             .size(32.dp)
                             .clip(RoundedCornerShape(8.dp))
-                            .background(
-                                when (item.mode) {
-                                    FirewallMode.BLOCK -> Color(0xFFFEE2E2)
-                                    FirewallMode.VPN -> SkyBluePrimaryContainer
-                                    FirewallMode.DIRECT -> SkyBlueSurfaceVariant
-                                }
-                            ),
+                            .background(SkyBlueSurfaceVariant.copy(alpha = 0.55f)),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
                             text = item.appName.firstOrNull()?.uppercase() ?: "A",
                             fontWeight = FontWeight.Bold,
-                            color = when (item.mode) {
-                                FirewallMode.BLOCK -> StatusError
-                                FirewallMode.VPN -> SkyBlueOnPrimaryContainer
-                                FirewallMode.DIRECT -> SkyBlueTextSecondary
-                            },
+                            color = SkyBlueTextTertiary,
                             fontSize = 14.sp
                         )
                     }
@@ -517,27 +453,27 @@ private fun AppFirewallRow(
                 ) {
                     CompactModeButton(
                         text = "Block",
-                        isSelected = item.mode == FirewallMode.BLOCK,
+                        isSelected = false,
                         activeColor = StatusError,
                         activeBg = Color(0xFFFEE2E2),
                         testTag = "firewall_mode_block",
-                        onClick = { onModeSelected(FirewallMode.BLOCK) }
+                        onClick = { onUnavailable("Per-app Block rule") }
                     )
                     CompactModeButton(
                         text = "VPN",
-                        isSelected = item.mode == FirewallMode.VPN,
+                        isSelected = false,
                         activeColor = SkyBluePrimary,
                         activeBg = SkyBluePrimaryContainer,
                         testTag = "firewall_mode_vpn",
-                        onClick = { onModeSelected(FirewallMode.VPN) }
+                        onClick = { onUnavailable("Per-app VPN routing") }
                     )
                     CompactModeButton(
                         text = "Direct",
-                        isSelected = item.mode == FirewallMode.DIRECT,
+                        isSelected = false,
                         activeColor = Color(0xFF64748B),
                         activeBg = Color(0xFFE2E8F0),
                         testTag = "firewall_mode_direct",
-                        onClick = { onModeSelected(FirewallMode.DIRECT) }
+                        onClick = { onUnavailable("Per-app Direct routing") }
                     )
                 }
             }
@@ -553,33 +489,29 @@ private fun AppFirewallRow(
                     Spacer(modifier = Modifier.height(8.dp))
 
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onUnavailable("Per-app speed exception") },
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
-                            text = "Speed Exception",
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Medium,
-                            color = SkyBlueTextPrimary
-                        )
+                        Column {
+                            Text("Speed Exception", fontSize = 11.sp, fontWeight = FontWeight.Medium, color = SkyBlueTextSecondary)
+                            Text("Not configured", fontSize = 9.sp, color = SkyBlueTextTertiary)
+                        }
                         Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                            listOf("Default", "Fast", "Throttled").forEach { opt ->
-                                val sel = item.speedException == opt
+                            listOf("Default", "Fast", "Throttled").forEach { option ->
                                 Surface(
                                     shape = RoundedCornerShape(6.dp),
-                                    color = if (sel) SkyBluePrimaryContainer else SkyBlueSurfaceVariant,
-                                    border = androidx.compose.foundation.BorderStroke(
-                                        1.dp,
-                                        if (sel) SkyBluePrimary else SkyBlueSurfaceBorder
-                                    ),
-                                    modifier = Modifier.clickable { onSpeedExceptionSelected(opt) }
+                                    color = SkyBlueSurfaceVariant.copy(alpha = 0.55f),
+                                    border = androidx.compose.foundation.BorderStroke(1.dp, SkyBlueSurfaceBorder),
+                                    modifier = Modifier.clickable { onUnavailable("Per-app speed exception") }
                                 ) {
                                     Text(
-                                        text = opt,
+                                        option,
                                         fontSize = 10.sp,
                                         fontWeight = FontWeight.Medium,
-                                        color = if (sel) SkyBluePrimary else SkyBlueTextSecondary,
+                                        color = SkyBlueTextTertiary,
                                         modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                                     )
                                 }
@@ -590,31 +522,44 @@ private fun AppFirewallRow(
                     Spacer(modifier = Modifier.height(6.dp))
 
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth().clickable { onUnavailable("Per-app ad-filter exemption") },
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Column {
-                            Text(
-                                text = "Screen-Aware Policy",
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = SkyBlueTextPrimary
-                            )
-                            Text(
-                                text = "Block traffic when screen turns off",
-                                fontSize = 9.sp,
-                                color = SkyBlueTextSecondary
-                            )
+                            Text("Ad-Filter Exemption", fontSize = 11.sp, fontWeight = FontWeight.Medium, color = SkyBlueTextSecondary)
+                            Text("Separate from app blocking and routing · Not configured", fontSize = 9.sp, color = SkyBlueTextTertiary)
                         }
                         Switch(
-                            checked = item.screenAwareRule,
-                            onCheckedChange = onScreenAwareToggled,
+                            checked = false,
+                            onCheckedChange = {},
+                            enabled = false,
                             colors = SwitchDefaults.colors(
-                                checkedThumbColor = Color.White,
-                                checkedTrackColor = SkyBluePrimary,
-                                uncheckedThumbColor = Color.White,
-                                uncheckedTrackColor = SkyBlueSurfaceBorder
+                                disabledUncheckedThumbColor = Color.White,
+                                disabledUncheckedTrackColor = SkyBlueSurfaceBorder
+                            ),
+                            modifier = Modifier.scale(0.8f)
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth().clickable { onUnavailable("Screen-aware policy") },
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column {
+                            Text("Screen-Aware Policy", fontSize = 11.sp, fontWeight = FontWeight.Medium, color = SkyBlueTextSecondary)
+                            Text("Block traffic when screen turns off · Not configured", fontSize = 9.sp, color = SkyBlueTextTertiary)
+                        }
+                        Switch(
+                            checked = false,
+                            onCheckedChange = {},
+                            enabled = false,
+                            colors = SwitchDefaults.colors(
+                                disabledUncheckedThumbColor = Color.White,
+                                disabledUncheckedTrackColor = SkyBlueSurfaceBorder
                             ),
                             modifier = Modifier.scale(0.8f)
                         )
