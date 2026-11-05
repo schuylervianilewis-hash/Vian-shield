@@ -917,11 +917,12 @@ private fun ConnectionStatusCard(
             Spacer(modifier = Modifier.height(4.dp))
 
             val subtitle = when (vpnState) {
-                is VpnState.Connected -> "WireGuard tunnel routing active on vianshield-tun"
-                is VpnState.Starting -> "Creating TUN interface and initializing native BoxService"
-                is VpnState.Stopping -> "Closing TUN descriptors and stopping BoxService"
+                is VpnState.Connected -> "Firewall runtime reported connected"
+                is VpnState.Starting -> "Starting VPN runtime"
+                is VpnState.Stopping -> "Stopping VPN runtime"
                 is VpnState.Error -> vpnState.message
-                is VpnState.Stopped -> "Ready to protect network connections"
+                is VpnState.Stopped -> "Firewall runtime is stopped"
+                is VpnState.RuntimePending -> "Firewall runtime integration is pending. No protection is active."
             }
 
             Text(

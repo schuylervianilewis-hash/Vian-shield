@@ -190,7 +190,7 @@ class VianshieldPhase1Test {
     @Test
     fun diagnosticViewModel_filterAndSearchIntegration() = runTest {
         OperationalLogCatcher.clear()
-        OperationalLogCatcher.info(LogCategory.ENGINE_INIT, "Core", "sing-box initialized")
+        OperationalLogCatcher.info(LogCategory.ENGINE_INIT, "Core", "network runtime initialization event")
         OperationalLogCatcher.error(LogCategory.ERROR_DIAGNOSTIC, "VpnService", "TUN failed to open", "fd=-1")
         OperationalLogCatcher.info(LogCategory.NETWORK_STATE, "Net", "Socket protected", "fd=15")
 

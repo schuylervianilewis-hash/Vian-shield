@@ -310,7 +310,7 @@ fun SettingsScreen(
                                 }
                             }
                             Text(
-                                text = "Native BoxService status, stack & crash inspector",
+                                text = "Firewall runtime status and diagnostic logs",
                                 fontSize = 12.sp,
                                 color = SkyBlueTextSecondary
                             )
