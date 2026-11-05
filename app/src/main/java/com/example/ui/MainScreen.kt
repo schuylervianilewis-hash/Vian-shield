@@ -103,268 +103,7 @@ fun MainScreen(
 ) {
     val vpnState by viewModel.vpnState.collectAsState()
     val activeProfile by viewModel.activeProfile.collectAsState()
-    val speedPreset by viewModel.speedPreset.collectAsState()
-    val dnsProvider by viewModel.dnsProvider.collectAsState()
-    val isAdFilterEnabled by viewModel.isAdFilterEnabled.collectAsState()
-    val adFilterAllowList by viewModel.adFilterAllowList.collectAsState()
-
     val context = LocalContext.current
-    var showSpeedDialog by remember { mutableStateOf(false) }
-    var showDnsDialog by remember { mutableStateOf(false) }
-    var showAllowListDialog by remember { mutableStateOf(false) }
-
-    // Speed Preset Selection Dialog
-    if (showSpeedDialog) {
-        val speedOptions = listOf(
-            "Unlimited (Full Speed)" to "Default line speed, no rate limiting",
-            "Gaming / Low Latency" to "Optimized packet buffer, prioritize latency",
-            "Battery Saver (5 Mbps)" to "Capped throughput for cellular power saving",
-            "Extreme Data Saver (1 Mbps)" to "Strict bandwidth limit for metered roaming"
-        )
-        AlertDialog(
-            onDismissRequest = { showSpeedDialog = false },
-            title = {
-                Text("Speed-Throttling Preset", fontWeight = FontWeight.Bold, color = SkyBlueTextPrimary)
-            },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(
-                        text = "Native rate limiting is staged. Engine throttling enforcement is scheduled for Phase 2.",
-                        fontSize = 11.sp,
-                        color = SkyBlueTextTertiary
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    speedOptions.forEach { (presetName, presetDesc) ->
-                        val isSelected = speedPreset == presetName
-                        Surface(
-                            onClick = {
-                                viewModel.setSpeedPreset(presetName)
-                                showSpeedDialog = false
-                            },
-                            shape = RoundedCornerShape(8.dp),
-                            color = if (isSelected) SkyBluePrimaryContainer else SkyBlueSurfaceVariant,
-                            border = androidx.compose.foundation.BorderStroke(
-                                1.dp,
-                                if (isSelected) SkyBluePrimary else SkyBlueSurfaceBorder
-                            ),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(12.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                RadioButton(
-                                    selected = isSelected,
-                                    onClick = {
-                                        viewModel.setSpeedPreset(presetName)
-                                        showSpeedDialog = false
-                                    },
-                                    colors = RadioButtonDefaults.colors(selectedColor = SkyBluePrimary)
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Column {
-                                    Text(
-                                        text = presetName,
-                                        fontWeight = FontWeight.SemiBold,
-                                        fontSize = 13.sp,
-                                        color = SkyBlueTextPrimary
-                                    )
-                                    Text(
-                                        text = presetDesc,
-                                        fontSize = 11.sp,
-                                        color = SkyBlueTextSecondary
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = { showSpeedDialog = false }) {
-                    Text("Close", color = SkyBluePrimary)
-                }
-            },
-            containerColor = SkyBlueSurface
-        )
-    }
-
-    // DNS Selection Dialog
-    if (showDnsDialog) {
-        val dnsOptions = listOf(
-            "Profile Default (from .conf)" to "Use upstream DNS server defined in active WireGuard profile",
-            "Cloudflare DNS (1.1.1.1)" to "Fast, privacy-first public DNS resolver",
-            "Quad9 Security (9.9.9.9)" to "Blocks malicious domains, botnets, and malware",
-            "Google Public DNS (8.8.8.8)" to "High reliability global Anycast resolvers",
-            "AdGuard DNS (94.140.14.14)" to "Default ad and tracker blocking at DNS layer"
-        )
-        AlertDialog(
-            onDismissRequest = { showDnsDialog = false },
-            title = {
-                Text("Select DNS Provider", fontWeight = FontWeight.Bold, color = SkyBlueTextPrimary)
-            },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(
-                        text = "Custom DNS overrides upstream server. Tunnel must restart to switch DNS detour.",
-                        fontSize = 11.sp,
-                        color = SkyBlueTextTertiary
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    dnsOptions.forEach { (dnsName, dnsDesc) ->
-                        val isSelected = dnsProvider == dnsName
-                        Surface(
-                            onClick = {
-                                viewModel.setDnsProvider(dnsName)
-                                showDnsDialog = false
-                            },
-                            shape = RoundedCornerShape(8.dp),
-                            color = if (isSelected) SkyBluePrimaryContainer else SkyBlueSurfaceVariant,
-                            border = androidx.compose.foundation.BorderStroke(
-                                1.dp,
-                                if (isSelected) SkyBluePrimary else SkyBlueSurfaceBorder
-                            ),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(12.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                RadioButton(
-                                    selected = isSelected,
-                                    onClick = {
-                                        viewModel.setDnsProvider(dnsName)
-                                        showDnsDialog = false
-                                    },
-                                    colors = RadioButtonDefaults.colors(selectedColor = SkyBluePrimary)
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Column {
-                                    Text(
-                                        text = dnsName,
-                                        fontWeight = FontWeight.SemiBold,
-                                        fontSize = 13.sp,
-                                        color = SkyBlueTextPrimary
-                                    )
-                                    Text(
-                                        text = dnsDesc,
-                                        fontSize = 11.sp,
-                                        color = SkyBlueTextSecondary
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = { showDnsDialog = false }) {
-                    Text("Close", color = SkyBluePrimary)
-                }
-            },
-            containerColor = SkyBlueSurface
-        )
-    }
-
-    // Ad Filter Allow-List Dialog
-    if (showAllowListDialog) {
-        var newDomainInput by remember { mutableStateOf("") }
-
-        AlertDialog(
-            onDismissRequest = { showAllowListDialog = false },
-            title = {
-                Text("Ad-Filter Allow-List", fontWeight = FontWeight.Bold, color = SkyBlueTextPrimary)
-            },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text(
-                        text = "Bypass sinkhole blocking for specific domains.",
-                        fontSize = 12.sp,
-                        color = SkyBlueTextSecondary
-                    )
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        OutlinedTextField(
-                            value = newDomainInput,
-                            onValueChange = { newDomainInput = it },
-                            placeholder = { Text("example.com", fontSize = 12.sp) },
-                            singleLine = true,
-                            shape = RoundedCornerShape(8.dp),
-                            modifier = Modifier.weight(1f),
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedContainerColor = SkyBlueSurface,
-                                unfocusedContainerColor = SkyBlueSurface
-                            )
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Button(
-                            onClick = {
-                                if (newDomainInput.isNotBlank()) {
-                                    viewModel.addAllowListDomain(newDomainInput)
-                                    newDomainInput = ""
-                                }
-                            },
-                            shape = RoundedCornerShape(8.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = SkyBluePrimary)
-                        ) {
-                            Text("Add")
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(4.dp))
-
-                    if (adFilterAllowList.isEmpty()) {
-                        Text(
-                            text = "No domains in allow-list",
-                            fontSize = 12.sp,
-                            color = SkyBlueTextTertiary
-                        )
-                    } else {
-                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                            adFilterAllowList.forEach { domain ->
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .background(SkyBlueSurfaceVariant, RoundedCornerShape(6.dp))
-                                        .padding(horizontal = 10.dp, vertical = 6.dp),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text(
-                                        text = domain,
-                                        fontSize = 12.sp,
-                                        fontFamily = FontFamily.Monospace,
-                                        color = SkyBlueTextPrimary
-                                    )
-                                    Icon(
-                                        imageVector = Icons.Default.Close,
-                                        contentDescription = "Remove",
-                                        tint = StatusError,
-                                        modifier = Modifier
-                                            .size(16.dp)
-                                            .clickable { viewModel.removeAllowListDomain(domain) }
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = { showAllowListDialog = false }) {
-                    Text("Done", color = SkyBluePrimary)
-                }
-            },
-            containerColor = SkyBlueSurface
-        )
-    }
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
@@ -425,34 +164,60 @@ fun MainScreen(
             PrimaryActionButton(
                 vpnState = vpnState,
                 activeProfile = activeProfile,
-                onToggle = { viewModel.toggleVpn() }
+                onUnavailable = {
+                    Toast.makeText(
+                        context,
+                        "Firewall protection is unavailable until the VPN/firewall runtime is integrated. No protection is active.",
+                        Toast.LENGTH_LONG
+                    ).show()
+                }
             )
 
-            // 2. Speed-Throttling Preset
+            // 2. Speed-Throttling Preset — visible, not actionable until enforcement exists.
             DashboardControlRow(
                 icon = Icons.Default.Speed,
                 title = "Speed-Throttling Preset",
-                value = speedPreset,
-                statusTag = "Limiter Inactive",
-                onClick = { showSpeedDialog = true },
+                value = "Not available until rate-limiting enforcement is implemented",
+                statusTag = "Unavailable",
+                onClick = {
+                    Toast.makeText(
+                        context,
+                        "Speed presets are not applied yet. Rate-limiting enforcement is not implemented.",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                },
                 testTag = "main_speed_preset_row"
             )
 
-            // 3. DNS Changer
+            // 3. DNS Changer — selecting a provider cannot change system/engine DNS yet.
             DashboardControlRow(
                 icon = Icons.Default.Dns,
                 title = "DNS Changer",
-                value = dnsProvider,
-                statusTag = "Active",
-                onClick = { showDnsDialog = true },
+                value = "DNS selection is not active yet",
+                statusTag = "Unavailable",
+                onClick = {
+                    Toast.makeText(
+                        context,
+                        "DNS selection is not applied yet. DNS runtime integration is pending.",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                },
                 testTag = "main_dns_changer_row"
             )
 
-            // 4. Ad Filter
+            // 4. Ad Filter — keep the control visible, but do not allow a false enabled state.
             Card(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable {
+                        Toast.makeText(
+                            context,
+                            "Ad and tracker filtering is not active. Filtering rules and runtime enforcement are not implemented.",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    },
                 shape = RoundedCornerShape(14.dp),
-                colors = CardDefaults.cardColors(containerColor = SkyBlueSurface),
+                colors = CardDefaults.cardColors(containerColor = SkyBlueSurfaceVariant.copy(alpha = 0.55f)),
                 border = androidx.compose.foundation.BorderStroke(1.dp, SkyBlueSurfaceBorder)
             ) {
                 Row(
@@ -470,15 +235,13 @@ fun MainScreen(
                             modifier = Modifier
                                 .size(36.dp)
                                 .clip(RoundedCornerShape(8.dp))
-                                .background(
-                                    if (isAdFilterEnabled) SkyBluePrimaryContainer else SkyBlueSurfaceVariant
-                                ),
+                                .background(SkyBlueSurfaceVariant),
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Block,
                                 contentDescription = null,
-                                tint = if (isAdFilterEnabled) SkyBluePrimary else SkyBlueTextTertiary,
+                                tint = SkyBlueTextTertiary,
                                 modifier = Modifier.size(20.dp)
                             )
                         }
@@ -486,57 +249,65 @@ fun MainScreen(
                         Spacer(modifier = Modifier.width(12.dp))
 
                         Column {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(
-                                    text = "Ad & Tracker Filter",
-                                    fontWeight = FontWeight.SemiBold,
-                                    fontSize = 14.sp,
-                                    color = SkyBlueTextPrimary
-                                )
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Surface(
-                                    shape = RoundedCornerShape(6.dp),
-                                    color = SkyBlueSurfaceVariant
-                                ) {
-                                    Text(
-                                        text = "Rules Staged",
-                                        fontSize = 10.sp,
-                                        fontWeight = FontWeight.Medium,
-                                        color = SkyBlueTextTertiary,
-                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                                    )
-                                }
-                            }
                             Text(
-                                text = if (isAdFilterEnabled) "Local sinkhole enabled (Phase 2)" else "Drop ad & telemetry domains",
+                                text = "Ad & Tracker Filter",
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 14.sp,
+                                color = SkyBlueTextSecondary
+                            )
+                            Text(
+                                text = "Filtering is not active — runtime not integrated",
                                 fontSize = 11.sp,
-                                color = if (isAdFilterEnabled) StatusConnected else SkyBlueTextSecondary
+                                color = SkyBlueTextTertiary
                             )
                         }
                     }
 
                     Switch(
-                        checked = isAdFilterEnabled,
-                        onCheckedChange = { viewModel.setAdFilterEnabled(it) },
+                        checked = false,
+                        onCheckedChange = {},
+                        enabled = false,
                         colors = SwitchDefaults.colors(
-                            checkedThumbColor = Color.White,
-                            checkedTrackColor = SkyBluePrimary,
-                            uncheckedThumbColor = Color.White,
-                            uncheckedTrackColor = SkyBlueSurfaceBorder
+                            disabledCheckedThumbColor = Color.White,
+                            disabledCheckedTrackColor = SkyBlueSurfaceBorder,
+                            disabledUncheckedThumbColor = Color.White,
+                            disabledUncheckedTrackColor = SkyBlueSurfaceBorder
                         ),
                         modifier = Modifier.testTag("main_ad_filter_switch")
                     )
                 }
             }
 
-            // 5. Ad-Filter Allow-List
+            // 5. Ad-Filter Allow-List — policy UI is staged until the filter exists.
             DashboardControlRow(
                 icon = Icons.Default.Security,
                 title = "Ad-Filter Allow-List",
-                value = "${adFilterAllowList.size} domains whitelisted",
-                statusTag = "Manage",
-                onClick = { showAllowListDialog = true },
+                value = "Domain exemptions are not available yet",
+                statusTag = "Unavailable",
+                onClick = {
+                    Toast.makeText(
+                        context,
+                        "The ad-filter allow-list is not active yet because the filtering runtime is not integrated.",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                },
                 testTag = "main_ad_allowlist_row"
+            )
+
+            // 6. Blocked-domain activity is a required entry point, pending its data pipeline.
+            DashboardControlRow(
+                icon = Icons.Default.Block,
+                title = "Blocked domains",
+                value = "Blocked-domain activity is not available yet",
+                statusTag = "Unavailable",
+                onClick = {
+                    Toast.makeText(
+                        context,
+                        "Blocked-domain activity is not available yet. DNS/ad-filter event collection is not integrated.",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                },
+                testTag = "main_blocked_domains_row"
             )
 
             // 6. Actual Protection Status and Relevant Errors
@@ -609,10 +380,13 @@ private fun DashboardControlRow(
     Card(
         modifier = Modifier
             .fillMaxWidth()
+            // Looks disabled, but remains tappable solely to explain why it is unavailable.
             .clickable(onClick = onClick)
             .testTag(testTag),
         shape = RoundedCornerShape(14.dp),
-        colors = CardDefaults.cardColors(containerColor = SkyBlueSurface),
+        colors = CardDefaults.cardColors(
+            containerColor = SkyBlueSurfaceVariant.copy(alpha = 0.55f)
+        ),
         border = androidx.compose.foundation.BorderStroke(1.dp, SkyBlueSurfaceBorder)
     ) {
         Row(
@@ -630,13 +404,13 @@ private fun DashboardControlRow(
                     modifier = Modifier
                         .size(36.dp)
                         .clip(RoundedCornerShape(8.dp))
-                        .background(SkyBluePrimaryContainer),
+                        .background(SkyBlueSurfaceVariant),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         imageVector = icon,
                         contentDescription = null,
-                        tint = SkyBlueOnPrimaryContainer,
+                        tint = SkyBlueTextTertiary,
                         modifier = Modifier.size(20.dp)
                     )
                 }
@@ -648,35 +422,26 @@ private fun DashboardControlRow(
                         text = title,
                         fontWeight = FontWeight.SemiBold,
                         fontSize = 14.sp,
-                        color = SkyBlueTextPrimary
+                        color = SkyBlueTextSecondary
                     )
                     Text(
                         text = value,
-                        fontSize = 12.sp,
-                        color = SkyBlueTextSecondary
+                        fontSize = 11.sp,
+                        color = SkyBlueTextTertiary
                     )
                 }
             }
 
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Surface(
-                    shape = RoundedCornerShape(6.dp),
-                    color = SkyBlueSurfaceVariant,
-                    modifier = Modifier.padding(end = 6.dp)
-                ) {
-                    Text(
-                        text = statusTag,
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = SkyBlueTextTertiary,
-                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                    )
-                }
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.ArrowForward,
-                    contentDescription = null,
-                    tint = SkyBlueTextTertiary,
-                    modifier = Modifier.size(16.dp)
+            Surface(
+                shape = RoundedCornerShape(6.dp),
+                color = SkyBlueSurface
+            ) {
+                Text(
+                    text = statusTag,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = SkyBlueTextTertiary,
+                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp)
                 )
             }
         }
@@ -687,7 +452,7 @@ private fun DashboardControlRow(
 private fun PrimaryActionButton(
     vpnState: VpnState,
     activeProfile: com.example.config.WireGuardProfile?,
-    onToggle: () -> Unit
+    onUnavailable: () -> Unit
 ) {
     val isConnected = vpnState is VpnState.Connected
     val isTransitioning = vpnState is VpnState.Starting || vpnState is VpnState.Stopping
@@ -719,7 +484,7 @@ private fun PrimaryActionButton(
         vpnState is VpnState.Stopping -> "Stopping VPN tunnel..."
         vpnState is VpnState.Error -> "Failed to establish tunnel"
         vpnState is VpnState.RuntimePending -> "Firewall runtime integration is pending. No protection is active."
-        else -> "Tap power button to connect"
+        else -> "Firewall runtime integration is pending. No protection is active."
     }
 
     Card(
@@ -807,10 +572,7 @@ private fun PrimaryActionButton(
                         color = buttonBorderColor,
                         shape = CircleShape
                     )
-                    .clickable(
-                        enabled = !isTransitioning,
-                        onClick = onToggle
-                    )
+                    .clickable(onClick = onUnavailable)
                     .testTag("vpn_toggle_button"),
                 contentAlignment = Alignment.Center
             ) {
