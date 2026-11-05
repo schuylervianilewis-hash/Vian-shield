@@ -133,6 +133,9 @@ class VianshieldPhase1Test {
         viewModel.navigateTo(AppScreen.VPN)
         assertEquals(AppScreen.VPN, viewModel.currentScreen.value)
 
+        viewModel.navigateTo(AppScreen.TRACKER)
+        assertEquals(AppScreen.TRACKER, viewModel.currentScreen.value)
+
         viewModel.navigateTo(AppScreen.PROFILES)
         assertEquals(AppScreen.PROFILES, viewModel.currentScreen.value)
 

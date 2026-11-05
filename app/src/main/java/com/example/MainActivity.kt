@@ -13,13 +13,13 @@ import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
@@ -35,6 +35,7 @@ import com.example.ui.LogKeeperScreen
 import com.example.ui.MainScreen
 import com.example.ui.ProfilesScreen
 import com.example.ui.SettingsScreen
+import com.example.ui.TrackerScreen
 import com.example.ui.theme.MyApplicationTheme
 import com.example.ui.theme.SkyBluePrimary
 import com.example.ui.theme.SkyBluePrimaryContainer
@@ -63,6 +64,7 @@ class MainActivity : ComponentActivity() {
                     NavTabItem(AppScreen.MAIN, "Main", Icons.Default.Security, "bottom_nav_main"),
                     NavTabItem(AppScreen.FIREWALL, "Firewall", Icons.Default.Tune, "bottom_nav_firewall"),
                     NavTabItem(AppScreen.VPN, "VPN", Icons.Default.Lock, "bottom_nav_vpn"),
+                    NavTabItem(AppScreen.TRACKER, "Tracker", Icons.Default.Visibility, "bottom_nav_tracker"),
                     NavTabItem(AppScreen.SETTINGS, "Settings", Icons.Default.Settings, "bottom_nav_settings")
                 )
 
@@ -71,6 +73,7 @@ class MainActivity : ComponentActivity() {
                     AppScreen.FIREWALL,
                     AppScreen.VPN,
                     AppScreen.PROFILES,
+                    AppScreen.TRACKER,
                     AppScreen.SETTINGS
                 )
 
@@ -140,6 +143,9 @@ class MainActivity : ComponentActivity() {
                                         viewModel = diagnosticViewModel,
                                         onBack = { diagnosticViewModel.navigateTo(AppScreen.MAIN) }
                                     )
+                                }
+                                AppScreen.TRACKER -> {
+                                    TrackerScreen()
                                 }
                                 AppScreen.SETTINGS -> {
                                     SettingsScreen(

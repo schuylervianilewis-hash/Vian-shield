@@ -27,6 +27,7 @@ enum class AppScreen {
     FIREWALL,
     VPN,
     PROFILES,
+    TRACKER,
     SETTINGS,
     LOG_KEEPER,
     DIAGNOSTICS
@@ -38,6 +39,7 @@ enum class TimeFilter(val label: String, val durationMs: Long?) {
     H12("12h", 12 * 3600 * 1000L),
     H24("24h", 24 * 3600 * 1000L)
 }
+
 
 class DiagnosticViewModel(application: Application) : AndroidViewModel(application) {
 
