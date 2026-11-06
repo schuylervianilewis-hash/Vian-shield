@@ -512,29 +512,6 @@ private fun AppFirewallRow(
                     Spacer(modifier = Modifier.height(6.dp))
 
                     Row(
-                        modifier = Modifier.fillMaxWidth().clickable { onUnavailable("Per-app ad-filter exemption") },
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column {
-                            Text("Ad-Filter Exemption", fontSize = 11.sp, fontWeight = FontWeight.Medium, color = SkyBlueTextSecondary)
-                            Text("Separate from app blocking and routing · Not configured", fontSize = 9.sp, color = SkyBlueTextTertiary)
-                        }
-                        Switch(
-                            checked = false,
-                            onCheckedChange = {},
-                            enabled = false,
-                            colors = SwitchDefaults.colors(
-                                disabledUncheckedThumbColor = Color.White,
-                                disabledUncheckedTrackColor = SkyBlueSurfaceBorder
-                            ),
-                            modifier = Modifier.scale(0.8f)
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(6.dp))
-
-                    Row(
                         modifier = Modifier.fillMaxWidth().clickable { onUnavailable("Screen-aware policy") },
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
