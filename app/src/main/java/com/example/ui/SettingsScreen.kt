@@ -48,9 +48,6 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -88,12 +85,6 @@ fun SettingsScreen(
     val pendingCrashCount by viewModel.pendingCrashCount.collectAsState()
     val diskSizeBytes = viewModel.getDiskLogSizeBytes()
     val context = LocalContext.current
-
-    // Local General Preferences toggles
-    var startOnBoot by remember { mutableStateOf(false) }
-    var persistentNotification by remember { mutableStateOf(true) }
-    var dnsLeakProtection by remember { mutableStateOf(true) }
-    var killSwitchPreview by remember { mutableStateOf(false) }
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
@@ -163,7 +154,7 @@ fun SettingsScreen(
                                     color = SkyBlueTextPrimary
                                 )
                                 Text(
-                                    text = "Permanent audit logs, search & downloads export",
+                                    text = "Bounded on-device logs, search & export",
                                     fontSize = 12.sp,
                                     color = SkyBlueTextSecondary
                                 )
@@ -190,16 +181,16 @@ fun SettingsScreen(
                     ) {
                         Column {
                             Text(
-                                text = "Operational Logging Switch",
+                                text = "Logging State",
                                 fontSize = 13.sp,
                                 fontWeight = FontWeight.SemiBold,
                                 color = SkyBlueTextPrimary
                             )
                             Text(
                                 text = if (isLoggingEnabled)
-                                    "Active (${diskSizeBytes / 1024} KB of 3 MiB rolling disk buffer)"
+                                    "Logging active (${diskSizeBytes / 1024} KB of 3 MiB rolling disk buffer)"
                                 else
-                                    "Logging disabled (Zero I/O overhead)",
+                                    "Logging disabled (no new events are recorded)",
                                 fontSize = 11.sp,
                                 color = if (isLoggingEnabled) StatusConnected else SkyBlueTextTertiary
                             )
@@ -369,7 +360,7 @@ fun SettingsScreen(
                             color = SkyBlueSurfaceVariant
                         ) {
                             Text(
-                                text = "Staged (Phase 2)",
+                                text = "Unavailable",
                                 fontSize = 10.sp,
                                 fontWeight = FontWeight.Medium,
                                 color = SkyBlueTextTertiary,
@@ -380,7 +371,7 @@ fun SettingsScreen(
 
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = "Export and restore WireGuard profiles, firewall rules, and application preferences.",
+                        text = "Backup and restore are not implemented yet. These controls do not export or import data.",
                         fontSize = 12.sp,
                         color = SkyBlueTextSecondary
                     )
@@ -392,13 +383,8 @@ fun SettingsScreen(
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
                         OutlinedButton(
-                            onClick = {
-                                Toast.makeText(
-                                    context,
-                                    "Backup staged — encrypted export scheduled for Phase 2",
-                                    Toast.LENGTH_SHORT
-                                ).show()
-                            },
+                            onClick = {},
+                            enabled = false,
                             shape = RoundedCornerShape(8.dp),
                             modifier = Modifier.weight(1f)
                         ) {
@@ -407,13 +393,8 @@ fun SettingsScreen(
                             Text("Export Backup", fontSize = 11.sp)
                         }
                         OutlinedButton(
-                            onClick = {
-                                Toast.makeText(
-                                    context,
-                                    "Restore staged — encrypted import scheduled for Phase 2",
-                                    Toast.LENGTH_SHORT
-                                ).show()
-                            },
+                            onClick = {},
+                            enabled = false,
                             shape = RoundedCornerShape(8.dp),
                             modifier = Modifier.weight(1f)
                         ) {
@@ -441,41 +422,45 @@ fun SettingsScreen(
                         fontSize = 15.sp,
                         color = SkyBlueTextPrimary
                     )
-
-                    Spacer(modifier = Modifier.height(10.dp))
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = "These planned options are unavailable in this build. They cannot be changed or applied until preference storage and the required Android/VPN runtime support are implemented.",
+                        fontSize = 11.sp,
+                        color = SkyBlueTextSecondary
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
 
                     PreferenceToggleRow(
                         title = "Start on Device Boot",
-                        subtitle = "Automatically establish VPN when Android system finishes boot",
-                        checked = startOnBoot,
-                        onCheckedChange = { startOnBoot = it }
+                        subtitle = "Automatic startup after Android boots is not implemented."
                     )
 
                     HorizontalDivider(color = SkyBlueSurfaceBorder, thickness = 1.dp, modifier = Modifier.padding(vertical = 8.dp))
 
                     PreferenceToggleRow(
                         title = "Persistent Notification",
-                        subtitle = "Foreground service notification with fast disconnect action",
-                        checked = persistentNotification,
-                        onCheckedChange = { persistentNotification = it }
+                        subtitle = "A VPN foreground-service notification is unavailable until a VPN service exists."
                     )
 
                     HorizontalDivider(color = SkyBlueSurfaceBorder, thickness = 1.dp, modifier = Modifier.padding(vertical = 8.dp))
 
                     PreferenceToggleRow(
                         title = "DNS Leak Protection",
-                        subtitle = "Strict routing detour forcing all DNS requests through WireGuard tunnel",
-                        checked = dnsLeakProtection,
-                        onCheckedChange = { dnsLeakProtection = it }
+                        subtitle = "DNS routing protection is not active while the VPN runtime is pending."
                     )
 
                     HorizontalDivider(color = SkyBlueSurfaceBorder, thickness = 1.dp, modifier = Modifier.padding(vertical = 8.dp))
 
                     PreferenceToggleRow(
                         title = "Kill Switch (Block without VPN)",
-                        subtitle = "Drop all packets when tunnel disconnects (System preview)",
-                        checked = killSwitchPreview,
-                        onCheckedChange = { killSwitchPreview = it }
+                        subtitle = "No traffic is blocked when a VPN connection is unavailable."
+                    )
+
+                    HorizontalDivider(color = SkyBlueSurfaceBorder, thickness = 1.dp, modifier = Modifier.padding(vertical = 8.dp))
+
+                    PreferenceToggleRow(
+                        title = "Exclude LAN Traffic",
+                        subtitle = "Local-network bypass policy is unavailable until VPN routing is implemented."
                     )
                 }
             }
@@ -500,10 +485,10 @@ fun SettingsScreen(
                     Spacer(modifier = Modifier.height(10.dp))
 
                     SettingInfoRow("App Name", "Vianshield")
-                    SettingInfoRow("Version", "1.0 (Build 2026.10)")
+                    SettingInfoRow("Version", "1.0")
                     SettingInfoRow("Firewall Runtime", "Integration pending")
                     SettingInfoRow("Target Architecture", "Android device ABIs (runtime not yet integrated)")
-                    SettingInfoRow("Privacy & Tracking", "Zero Telemetry | 100% On-Device")
+                    SettingInfoRow("Privacy & Tracking", "Not yet audited")
                 }
             }
 
@@ -515,9 +500,7 @@ fun SettingsScreen(
 @Composable
 private fun PreferenceToggleRow(
     title: String,
-    subtitle: String,
-    checked: Boolean,
-    onCheckedChange: (Boolean) -> Unit
+    subtitle: String
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -537,16 +520,26 @@ private fun PreferenceToggleRow(
                 fontSize = 11.sp,
                 color = SkyBlueTextSecondary
             )
+            Text(
+                text = "Unavailable in this build",
+                fontSize = 10.sp,
+                color = SkyBlueTextTertiary
+            )
         }
         Spacer(modifier = Modifier.width(8.dp))
         Switch(
-            checked = checked,
-            onCheckedChange = onCheckedChange,
+            checked = false,
+            onCheckedChange = null,
+            enabled = false,
             colors = SwitchDefaults.colors(
                 checkedThumbColor = Color.White,
                 checkedTrackColor = SkyBluePrimary,
                 uncheckedThumbColor = Color.White,
-                uncheckedTrackColor = SkyBlueSurfaceBorder
+                uncheckedTrackColor = SkyBlueSurfaceBorder,
+                disabledCheckedThumbColor = Color.White,
+                disabledCheckedTrackColor = SkyBlueSurfaceBorder,
+                disabledUncheckedThumbColor = Color.White,
+                disabledUncheckedTrackColor = SkyBlueSurfaceBorder
             )
         )
     }

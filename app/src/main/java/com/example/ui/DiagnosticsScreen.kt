@@ -232,7 +232,7 @@ fun DiagnosticsScreen(
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
-                        text = "All engine lifecycle events, configuration transformations, socket protect calls, and TUN interactions are recorded in the bounded Log Keeper audit trail.",
+                        text = "Current log entries reflect events produced by the application code present in this build. Engine lifecycle, socket-protection, and TUN activity cannot be captured because no VPN runtime is integrated.",
                         fontSize = 12.sp,
                         color = SkyBlueTextSecondary
                     )

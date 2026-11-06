@@ -46,8 +46,8 @@ data class LogEvent(
  * 1. Master On/Off switch - when disabled, no logs are recorded.
  * 2. Strictly Bounded - caps in-memory retention to 500 entries (FIFO) and local disk log to 256KB.
  * 3. Secret Redaction - strips private keys, preshared keys, and credentials before recording.
- * 4. Zero Fabricated Telemetry - captures ONLY genuine observable engine, tunnel, and network events.
- * 5. No PII, browsing history, or packet tracking.
+ * 4. Event-driven only - records messages explicitly sent by application code.
+ * 5. Does not inspect packets or collect browser history; event messages may contain app metadata.
  */
 object OperationalLogCatcher {
 
@@ -178,8 +178,8 @@ object OperationalLogCatcher {
         sb.append("Total In-Memory Entries: ").append(_events.value.size).append(" (Cap: 500 FIFO)\n")
         sb.append("Persistent Storage Limit: 3 MiB total (Active: 1.5 MiB, Rotated: 1.5 MiB)\n")
         sb.append("Current Persistent Usage: ").append(getDiskLogSizeBytes()).append(" bytes\n")
-        sb.append("Master Switch State: ").append(if (_isLoggingEnabled.value) "ENABLED" else "DISABLED").append("\n")
-        sb.append("Privacy Policy: All cryptographic private keys/secrets redacted. Zero browsing telemetry.\n")
+        sb.append("Logging State: ").append(if (_isLoggingEnabled.value) "ENABLED" else "DISABLED").append("\n")
+        sb.append("Privacy Note: This logger records app events only; it does not inspect packets or collect browser history. Secrets are redacted.\n")
         sb.append("Phase 1 Reality: Per-app traffic decisions & DNS ad-blocking are not active in Phase 1.\n\n")
 
         _events.value.forEach { e ->
