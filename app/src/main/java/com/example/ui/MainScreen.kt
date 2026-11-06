@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -160,7 +161,7 @@ fun MainScreen(
             // 6. Actual protection status and relevant errors
             // ================================================================
 
-            // 1. Master Protection Switch
+            // Keep the main protection action prominent; feature shortcuts follow in a two-column grid.
             PrimaryActionButton(
                 vpnState = vpnState,
                 activeProfile = activeProfile,
@@ -173,142 +174,52 @@ fun MainScreen(
                 }
             )
 
-            // 2. Speed-Throttling Preset — visible, not actionable until enforcement exists.
-            DashboardControlRow(
-                icon = Icons.Default.Speed,
-                title = "Speed-Throttling Preset",
-                value = "Not available until rate-limiting enforcement is implemented",
-                statusTag = "Unavailable",
-                onClick = {
-                    Toast.makeText(
-                        context,
-                        "Speed presets are not applied yet. Rate-limiting enforcement is not implemented.",
-                        Toast.LENGTH_SHORT
-                    ).show()
-                },
-                testTag = "main_speed_preset_row"
+            Text(
+                text = "Quick Settings",
+                modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
+                fontWeight = FontWeight.Bold,
+                fontSize = 16.sp,
+                color = SkyBlueTextPrimary
             )
 
-            // 3. DNS Changer — selecting a provider cannot change system/engine DNS yet.
-            DashboardControlRow(
-                icon = Icons.Default.Dns,
-                title = "DNS Changer",
-                value = "DNS selection is not active yet",
-                statusTag = "Unavailable",
-                onClick = {
-                    Toast.makeText(
-                        context,
-                        "DNS selection is not applied yet. DNS runtime integration is pending.",
-                        Toast.LENGTH_SHORT
-                    ).show()
-                },
-                testTag = "main_dns_changer_row"
-            )
-
-            // 4. Ad Filter — keep the control visible, but do not allow a false enabled state.
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable {
-                        Toast.makeText(
-                            context,
-                            "Ad and tracker filtering is not active. Filtering rules and runtime enforcement are not implemented.",
-                            Toast.LENGTH_SHORT
-                        ).show()
-                    },
-                shape = RoundedCornerShape(14.dp),
-                colors = CardDefaults.cardColors(containerColor = SkyBlueSurfaceVariant.copy(alpha = 0.55f)),
-                border = androidx.compose.foundation.BorderStroke(1.dp, SkyBlueSurfaceBorder)
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(14.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    DashboardActionCard(
+                        icon = Icons.Default.Speed,
+                        title = "Speed Preset",
+                        description = "Throttling options",
+                        testTag = "main_action_speed",
                         modifier = Modifier.weight(1f),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(36.dp)
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(SkyBlueSurfaceVariant),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Block,
-                                contentDescription = null,
-                                tint = SkyBlueTextTertiary,
-                                modifier = Modifier.size(20.dp)
-                            )
-                        }
-
-                        Spacer(modifier = Modifier.width(12.dp))
-
-                        Column {
-                            Text(
-                                text = "Ad & Tracker Filter",
-                                fontWeight = FontWeight.SemiBold,
-                                fontSize = 14.sp,
-                                color = SkyBlueTextSecondary
-                            )
-                            Text(
-                                text = "Filtering is not active — runtime not integrated",
-                                fontSize = 11.sp,
-                                color = SkyBlueTextTertiary
-                            )
-                        }
-                    }
-
-                    Switch(
-                        checked = false,
-                        onCheckedChange = {},
-                        enabled = false,
-                        colors = SwitchDefaults.colors(
-                            disabledCheckedThumbColor = Color.White,
-                            disabledCheckedTrackColor = SkyBlueSurfaceBorder,
-                            disabledUncheckedThumbColor = Color.White,
-                            disabledUncheckedTrackColor = SkyBlueSurfaceBorder
-                        ),
-                        modifier = Modifier.testTag("main_ad_filter_switch")
+                        onClick = { onNavigate(AppScreen.SPEED_PRESET) }
+                    )
+                    DashboardActionCard(
+                        icon = Icons.Default.Dns,
+                        title = "DNS Changer",
+                        description = "Choose DNS provider",
+                        testTag = "main_action_dns",
+                        modifier = Modifier.weight(1f),
+                        onClick = { onNavigate(AppScreen.DNS_CHANGER) }
+                    )
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    DashboardActionCard(
+                        icon = Icons.Default.Block,
+                        title = "Ad Filter",
+                        description = "Filtering and whitelist",
+                        testTag = "main_action_ad_filter",
+                        modifier = Modifier.weight(1f),
+                        onClick = { onNavigate(AppScreen.AD_FILTER) }
+                    )
+                    DashboardActionCard(
+                        icon = Icons.Default.Security,
+                        title = "Blocked Domains",
+                        description = "Blocked-domain history",
+                        testTag = "main_action_blocked_domains",
+                        modifier = Modifier.weight(1f),
+                        onClick = { onNavigate(AppScreen.BLOCKED_DOMAINS) }
                     )
                 }
             }
-
-            // 5. Ad-Filter Allow-List — policy UI is staged until the filter exists.
-            DashboardControlRow(
-                icon = Icons.Default.Security,
-                title = "Ad-Filter Allow-List",
-                value = "Domain exemptions are not available yet",
-                statusTag = "Unavailable",
-                onClick = {
-                    Toast.makeText(
-                        context,
-                        "The ad-filter allow-list is not active yet because the filtering runtime is not integrated.",
-                        Toast.LENGTH_SHORT
-                    ).show()
-                },
-                testTag = "main_ad_allowlist_row"
-            )
-
-            // 6. Blocked-domain activity is a required entry point, pending its data pipeline.
-            DashboardControlRow(
-                icon = Icons.Default.Block,
-                title = "Blocked domains",
-                value = "Blocked-domain activity is not available yet",
-                statusTag = "Unavailable",
-                onClick = {
-                    Toast.makeText(
-                        context,
-                        "Blocked-domain activity is not available yet. DNS/ad-filter event collection is not integrated.",
-                        Toast.LENGTH_SHORT
-                    ).show()
-                },
-                testTag = "main_blocked_domains_row"
-            )
 
             // 6. Actual Protection Status and Relevant Errors
             ConnectionStatusCard(
@@ -369,81 +280,33 @@ fun MainScreen(
 }
 
 @Composable
-private fun DashboardControlRow(
+private fun DashboardActionCard(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     title: String,
-    value: String,
-    statusTag: String,
-    onClick: () -> Unit,
-    testTag: String
+    description: String,
+    testTag: String,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
 ) {
     Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            // Looks disabled, but remains tappable solely to explain why it is unavailable.
-            .clickable(onClick = onClick)
-            .testTag(testTag),
-        shape = RoundedCornerShape(14.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = SkyBlueSurfaceVariant.copy(alpha = 0.55f)
-        ),
-        border = androidx.compose.foundation.BorderStroke(1.dp, SkyBlueSurfaceBorder)
+        modifier = modifier.heightIn(min = 116.dp).clickable(onClick = onClick).testTag(testTag),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = SkyBlueSurface),
+        border = androidx.compose.foundation.BorderStroke(1.dp, SkyBlueSurfaceBorder),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(14.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Row(
-                modifier = Modifier.weight(1f),
-                verticalAlignment = Alignment.CenterVertically
+            Box(
+                modifier = Modifier.size(36.dp).clip(RoundedCornerShape(10.dp)).background(SkyBluePrimaryContainer),
+                contentAlignment = Alignment.Center
             ) {
-                Box(
-                    modifier = Modifier
-                        .size(36.dp)
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(SkyBlueSurfaceVariant),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = icon,
-                        contentDescription = null,
-                        tint = SkyBlueTextTertiary,
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
-
-                Spacer(modifier = Modifier.width(12.dp))
-
-                Column {
-                    Text(
-                        text = title,
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 14.sp,
-                        color = SkyBlueTextSecondary
-                    )
-                    Text(
-                        text = value,
-                        fontSize = 11.sp,
-                        color = SkyBlueTextTertiary
-                    )
-                }
+                Icon(icon, contentDescription = null, tint = SkyBluePrimary, modifier = Modifier.size(20.dp))
             }
-
-            Surface(
-                shape = RoundedCornerShape(6.dp),
-                color = SkyBlueSurface
-            ) {
-                Text(
-                    text = statusTag,
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = SkyBlueTextTertiary,
-                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp)
-                )
-            }
+            Text(title, fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = SkyBlueTextPrimary)
+            Text(description, fontSize = 11.sp, color = SkyBlueTextSecondary)
         }
     }
 }
