@@ -29,6 +29,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 import com.example.ui.AppScreen
 import com.example.ui.DiagnosticsScreen
+import com.example.ui.SpeedPresetScreen
+import com.example.ui.DnsChangerScreen
+import com.example.ui.AdFilterScreen
+import com.example.ui.AdFilterWhitelistScreen
+import com.example.ui.BlockedDomainsScreen
 import com.example.ui.DiagnosticViewModel
 import com.example.ui.FirewallScreen
 import com.example.ui.LogKeeperScreen
@@ -177,6 +182,14 @@ class MainActivity : ComponentActivity() {
                                 onOpenLogKeeper = { diagnosticViewModel.navigateTo(AppScreen.LOG_KEEPER) }
                             )
                         }
+                        AppScreen.SPEED_PRESET -> SpeedPresetScreen(onBack = { diagnosticViewModel.navigateTo(AppScreen.MAIN) })
+                        AppScreen.DNS_CHANGER -> DnsChangerScreen(onBack = { diagnosticViewModel.navigateTo(AppScreen.MAIN) })
+                        AppScreen.AD_FILTER -> AdFilterScreen(
+                            onBack = { diagnosticViewModel.navigateTo(AppScreen.MAIN) },
+                            onOpenWhitelist = { diagnosticViewModel.navigateTo(AppScreen.AD_FILTER_WHITELIST) }
+                        )
+                        AppScreen.AD_FILTER_WHITELIST -> AdFilterWhitelistScreen(onBack = { diagnosticViewModel.navigateTo(AppScreen.AD_FILTER) })
+                        AppScreen.BLOCKED_DOMAINS -> BlockedDomainsScreen(onBack = { diagnosticViewModel.navigateTo(AppScreen.MAIN) })
                         else -> {
                             MainScreen(
                                 viewModel = diagnosticViewModel,

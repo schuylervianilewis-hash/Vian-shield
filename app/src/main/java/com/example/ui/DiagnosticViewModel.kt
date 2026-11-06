@@ -29,6 +29,11 @@ enum class AppScreen {
     PROFILES,
     TRACKER,
     SETTINGS,
+    SPEED_PRESET,
+    DNS_CHANGER,
+    AD_FILTER,
+    AD_FILTER_WHITELIST,
+    BLOCKED_DOMAINS,
     LOG_KEEPER,
     DIAGNOSTICS
 }

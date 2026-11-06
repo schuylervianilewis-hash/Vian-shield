@@ -139,6 +139,17 @@ class VianshieldPhase1Test {
         viewModel.navigateTo(AppScreen.PROFILES)
         assertEquals(AppScreen.PROFILES, viewModel.currentScreen.value)
 
+        viewModel.navigateTo(AppScreen.SPEED_PRESET)
+        assertEquals(AppScreen.SPEED_PRESET, viewModel.currentScreen.value)
+        viewModel.navigateTo(AppScreen.DNS_CHANGER)
+        assertEquals(AppScreen.DNS_CHANGER, viewModel.currentScreen.value)
+        viewModel.navigateTo(AppScreen.AD_FILTER)
+        assertEquals(AppScreen.AD_FILTER, viewModel.currentScreen.value)
+        viewModel.navigateTo(AppScreen.AD_FILTER_WHITELIST)
+        assertEquals(AppScreen.AD_FILTER_WHITELIST, viewModel.currentScreen.value)
+        viewModel.navigateTo(AppScreen.BLOCKED_DOMAINS)
+        assertEquals(AppScreen.BLOCKED_DOMAINS, viewModel.currentScreen.value)
+
         viewModel.navigateTo(AppScreen.DIAGNOSTICS)
         assertEquals(AppScreen.DIAGNOSTICS, viewModel.currentScreen.value)
 
