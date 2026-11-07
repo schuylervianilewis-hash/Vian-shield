@@ -104,108 +104,96 @@ fun SettingsScreen(
                 .fillMaxSize()
                 .padding(innerPadding)
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             // ================================================================
-            // 1. Log Keeper Navigation Row & Operational Logging
+            // 1. Log Keeper Navigation & Operational Logging
             // ================================================================
             Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable(onClick = onOpenLogKeeper)
-                    .testTag("settings_open_log_keeper_button"),
-                shape = RoundedCornerShape(16.dp),
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
                 colors = CardDefaults.cardColors(containerColor = SkyBlueSurface),
                 border = androidx.compose.foundation.BorderStroke(1.dp, SkyBlueSurfaceBorder)
             ) {
-                Column(modifier = Modifier.padding(16.dp)) {
+                Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp)) {
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable(onClick = onOpenLogKeeper)
+                            .testTag("settings_open_log_keeper_button"),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Row(
-                            modifier = Modifier.weight(1f),
-                            verticalAlignment = Alignment.CenterVertically
+                        Box(
+                            modifier = Modifier.size(32.dp)
+                                .background(SkyBluePrimaryContainer, RoundedCornerShape(8.dp)),
+                            contentAlignment = Alignment.Center
                         ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(40.dp)
-                                    .background(SkyBluePrimaryContainer, RoundedCornerShape(10.dp)),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.ListAlt,
-                                    contentDescription = null,
-                                    tint = SkyBlueOnPrimaryContainer,
-                                    modifier = Modifier.size(22.dp)
+                            Icon(
+                                imageVector = Icons.Default.ListAlt,
+                                contentDescription = null,
+                                tint = SkyBlueOnPrimaryContainer,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(9.dp))
+                        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    text = "Log Keeper",
+                                    fontWeight = FontWeight.SemiBold,
+                                    fontSize = 14.sp,
+                                    color = SkyBlueTextPrimary
                                 )
-                            }
-                            Spacer(modifier = Modifier.width(12.dp))
-                            Column {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Text(
-                                        text = "Log Keeper",
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 15.sp,
-                                        color = SkyBlueTextPrimary
-                                    )
-                                    if (pendingCrashCount > 0) {
-                                        Spacer(modifier = Modifier.width(6.dp))
-                                        Surface(
-                                            shape = RoundedCornerShape(6.dp),
-                                            color = StatusError
-                                        ) {
-                                            Text(
-                                                text = "$pendingCrashCount Crashes",
-                                                fontSize = 9.sp,
-                                                fontWeight = FontWeight.Bold,
-                                                color = Color.White,
-                                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
-                                            )
-                                        }
+                                if (pendingCrashCount > 0) {
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Surface(shape = RoundedCornerShape(6.dp), color = StatusError) {
+                                        Text(
+                                            text = "$pendingCrashCount Crashes",
+                                            fontSize = 9.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color.White,
+                                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                                        )
                                     }
                                 }
-                                Text(
-                                    text = "Runtime status, crash reports, bounded logs, search & export",
-                                    fontSize = 12.sp,
-                                    color = SkyBlueTextSecondary
-                                )
                             }
+                            Text(
+                                text = "Runtime status, crash reports and logs",
+                                fontSize = 10.sp,
+                                color = SkyBlueTextSecondary
+                            )
                         }
-
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowForward,
                             contentDescription = "Open Log Keeper",
                             tint = SkyBluePrimary,
-                            modifier = Modifier.size(18.dp)
+                            modifier = Modifier.size(17.dp)
                         )
                     }
 
-                    Spacer(modifier = Modifier.height(12.dp))
+                    Spacer(modifier = Modifier.height(7.dp))
                     HorizontalDivider(color = SkyBlueSurfaceBorder, thickness = 1.dp)
-                    Spacer(modifier = Modifier.height(10.dp))
+                    Spacer(modifier = Modifier.height(5.dp))
 
-                    // Logging master toggle & disk status
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Column {
+                        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
                             Text(
                                 text = "Logging State",
-                                fontSize = 13.sp,
+                                fontSize = 12.sp,
                                 fontWeight = FontWeight.SemiBold,
                                 color = SkyBlueTextPrimary
                             )
                             Text(
                                 text = if (isLoggingEnabled)
-                                    "Logging active (${diskSizeBytes / 1024} KB of 3 MiB rolling disk buffer)"
+                                    "On · ${diskSizeBytes / 1024} KB of 3 MiB used"
                                 else
-                                    "Logging disabled (no new events are recorded)",
-                                fontSize = 11.sp,
+                                    "Off · No new events are recorded",
+                                fontSize = 10.sp,
                                 color = if (isLoggingEnabled) StatusConnected else SkyBlueTextTertiary
                             )
                         }
@@ -220,34 +208,15 @@ fun SettingsScreen(
                             ),
                             modifier = Modifier.testTag("master_log_switch")
                         )
-                    }
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        OutlinedButton(
-                            onClick = onOpenLogKeeper,
-                            shape = RoundedCornerShape(8.dp),
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Text("View Full Log Viewer", fontSize = 11.sp)
-                        }
-                        OutlinedButton(
+                        TextButton(
                             onClick = {
                                 viewModel.clearLogs()
                                 Toast.makeText(context, "Operational logs cleared", Toast.LENGTH_SHORT).show()
                             },
-                            shape = RoundedCornerShape(8.dp),
-                            modifier = Modifier
-                                .weight(1f)
-                                .testTag("settings_clear_logs_button")
+                            modifier = Modifier.testTag("settings_clear_logs_button"),
+                            contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 6.dp, vertical = 2.dp)
                         ) {
-                            Icon(imageVector = Icons.Default.DeleteSweep, contentDescription = null, modifier = Modifier.size(14.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("Clear Logs", fontSize = 11.sp)
+                            Text("Clear", fontSize = 11.sp)
                         }
                     }
                 }
@@ -258,86 +227,48 @@ fun SettingsScreen(
             // ================================================================
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
+                shape = RoundedCornerShape(12.dp),
                 colors = CardDefaults.cardColors(containerColor = SkyBlueSurface),
                 border = androidx.compose.foundation.BorderStroke(1.dp, SkyBlueSurfaceBorder)
             ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier.size(30.dp)
+                            .background(SkyBlueSurfaceVariant, RoundedCornerShape(8.dp)),
+                        contentAlignment = Alignment.Center
                     ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Box(
-                                modifier = Modifier
-                                    .size(36.dp)
-                                    .background(SkyBlueSurfaceVariant, RoundedCornerShape(8.dp)),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Backup,
-                                    contentDescription = null,
-                                    tint = SkyBlueTextPrimary,
-                                    modifier = Modifier.size(20.dp)
-                                )
-                            }
-                            Spacer(modifier = Modifier.width(10.dp))
-                            Text(
-                                text = "Backup & Restoration",
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 15.sp,
-                                color = SkyBlueTextPrimary
-                            )
-                        }
-
-                        Surface(
-                            shape = RoundedCornerShape(6.dp),
-                            color = SkyBlueSurfaceVariant
-                        ) {
-                            Text(
-                                text = "Unavailable",
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = SkyBlueTextTertiary,
-                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                            )
-                        }
+                        Icon(
+                            imageVector = Icons.Default.Backup,
+                            contentDescription = null,
+                            tint = SkyBlueTextPrimary,
+                            modifier = Modifier.size(17.dp)
+                        )
                     }
-
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = "Backup and restore are not implemented yet. These controls do not export or import data.",
-                        fontSize = 12.sp,
-                        color = SkyBlueTextSecondary
-                    )
-
-                    Spacer(modifier = Modifier.height(10.dp))
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        OutlinedButton(
-                            onClick = {},
-                            enabled = false,
-                            shape = RoundedCornerShape(8.dp),
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Icon(imageVector = Icons.Default.Backup, contentDescription = null, modifier = Modifier.size(14.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("Export Backup", fontSize = 11.sp)
-                        }
-                        OutlinedButton(
-                            onClick = {},
-                            enabled = false,
-                            shape = RoundedCornerShape(8.dp),
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Icon(imageVector = Icons.Default.Restore, contentDescription = null, modifier = Modifier.size(14.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("Restore Backup", fontSize = 11.sp)
-                        }
+                    Spacer(modifier = Modifier.width(9.dp))
+                    Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                        Text(
+                            text = "Backup & Restoration",
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 13.sp,
+                            color = SkyBlueTextPrimary
+                        )
+                        Text(
+                            text = "Not implemented · Backup and restore are unavailable",
+                            fontSize = 10.sp,
+                            color = SkyBlueTextSecondary
+                        )
+                    }
+                    Surface(shape = RoundedCornerShape(6.dp), color = SkyBlueSurfaceVariant) {
+                        Text(
+                            text = "Unavailable",
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = SkyBlueTextTertiary,
+                            modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
+                        )
                     }
                 }
             }
