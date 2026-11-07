@@ -243,8 +243,8 @@ fun ProfilesScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
+                .padding(horizontal = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             // 1. Connection / Profile Health Status Card
             item {
@@ -311,8 +311,8 @@ fun ProfilesScreen(
                         Column(modifier = Modifier.padding(14.dp)) {
                             Text(
                                 text = "Manual Configuration Editor",
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 14.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 13.sp,
                                 color = SkyBlueTextPrimary
                             )
                             Spacer(modifier = Modifier.height(4.dp))
@@ -393,21 +393,22 @@ private fun VpnHealthStatusCard(
 
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(containerColor = SkyBlueSurface),
         border = androidx.compose.foundation.BorderStroke(1.dp, SkyBlueSurfaceBorder)
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.padding(10.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(
+                    modifier = Modifier.weight(1f),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
                     Box(
-                        modifier = Modifier
-                            .size(36.dp)
-                            .clip(CircleShape)
+                        modifier = Modifier.size(30.dp).clip(CircleShape)
                             .background(statusColor.copy(alpha = 0.12f)),
                         contentAlignment = Alignment.Center
                     ) {
@@ -415,73 +416,63 @@ private fun VpnHealthStatusCard(
                             imageVector = statusIcon,
                             contentDescription = null,
                             tint = statusColor,
-                            modifier = Modifier.size(20.dp)
+                            modifier = Modifier.size(17.dp)
                         )
                     }
-                    Spacer(modifier = Modifier.width(10.dp))
-                    Column {
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
                         Text(
                             text = statusText,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 15.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 13.sp,
                             color = SkyBlueTextPrimary
                         )
                         Text(
                             text = when (vpnState) {
-                                is VpnState.Connected -> "Encrypted UDP userspace tunnel active"
+                                is VpnState.Connected -> "Tunnel reports connected"
                                 is VpnState.Error -> vpnState.message
-                                is VpnState.RuntimePending -> "WireGuard runtime integration is pending"
+                                is VpnState.RuntimePending -> "Profile management only; tunnel runtime pending"
                                 else -> "Disconnected"
                             },
-                            fontSize = 11.sp,
-                            color = SkyBlueTextSecondary
+                            fontSize = 10.sp,
+                            color = SkyBlueTextSecondary,
+                            maxLines = 2
                         )
                     }
                 }
-
-                Surface(
-                    shape = RoundedCornerShape(8.dp),
-                    color = SkyBlueSurfaceVariant
-                ) {
+                Surface(shape = RoundedCornerShape(7.dp), color = SkyBlueSurfaceVariant) {
                     Text(
                         text = "WireGuard",
-                        fontSize = 11.sp,
+                        fontSize = 10.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = SkyBlueTextSecondary,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                        modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp)
                     )
                 }
             }
 
             if (activeProfile != null) {
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(7.dp))
                 HorizontalDivider(color = SkyBlueSurfaceBorder, thickness = 1.dp)
-                Spacer(modifier = Modifier.height(10.dp))
-
+                Spacer(modifier = Modifier.height(6.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Column {
-                        Text("Active Endpoint", fontSize = 11.sp, color = SkyBlueTextTertiary)
-                        Text(
-                            "${activeProfile.endpointHost}:${activeProfile.endpointPort}",
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Medium,
-                            fontFamily = FontFamily.Monospace,
-                            color = SkyBlueTextPrimary
-                        )
-                    }
-                    Column(horizontalAlignment = Alignment.End) {
-                        Text("Tunnel Address", fontSize = 11.sp, color = SkyBlueTextTertiary)
-                        Text(
-                            activeProfile.address,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Medium,
-                            fontFamily = FontFamily.Monospace,
-                            color = SkyBlueTextPrimary
-                        )
-                    }
+                    Text(
+                        "Endpoint  ${activeProfile.endpointHost}:${activeProfile.endpointPort}",
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Medium,
+                        fontFamily = FontFamily.Monospace,
+                        color = SkyBlueTextPrimary
+                    )
+                    Text(
+                        "Address  ${activeProfile.address}",
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Medium,
+                        fontFamily = FontFamily.Monospace,
+                        color = SkyBlueTextPrimary
+                    )
                 }
             }
         }
@@ -500,7 +491,7 @@ private fun SavedProfileCard(
         modifier = Modifier
             .fillMaxWidth()
             .testTag("saved_profile_${item.id}"),
-        shape = RoundedCornerShape(14.dp),
+        shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(
             containerColor = if (isSelected) SkyBluePrimaryContainer.copy(alpha = 0.35f) else SkyBlueSurface
         ),
@@ -509,7 +500,7 @@ private fun SavedProfileCard(
             if (isSelected) SkyBluePrimary else SkyBlueSurfaceBorder
         )
     ) {
-        Column(modifier = Modifier.padding(14.dp)) {
+        Column(modifier = Modifier.padding(10.dp)) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -523,7 +514,7 @@ private fun SavedProfileCard(
                 ) {
                     Box(
                         modifier = Modifier
-                            .size(36.dp)
+                            .size(30.dp)
                             .clip(RoundedCornerShape(8.dp))
                             .background(if (isSelected) SkyBluePrimary else SkyBlueSurfaceVariant),
                         contentAlignment = Alignment.Center
@@ -532,11 +523,11 @@ private fun SavedProfileCard(
                             imageVector = if (isSelected) Icons.Default.Check else Icons.Default.Security,
                             contentDescription = null,
                             tint = if (isSelected) Color.White else SkyBlueTextSecondary,
-                            modifier = Modifier.size(18.dp)
+                            modifier = Modifier.size(16.dp)
                         )
                     }
 
-                    Spacer(modifier = Modifier.width(10.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
 
                     Column {
                         Row(verticalAlignment = Alignment.CenterVertically) {
