@@ -39,7 +39,7 @@ The current architecture documents describe the checked-in preparation-stage sou
 - Android Gradle Plugin 9.1.1 and Kotlin 2.2.10 as declared in the version catalog.
 - The GitHub Actions workflow currently installs Gradle 9.3.1.
 
-The repository currently does not include the `gradlew` wrapper scripts. Use a compatible local Gradle installation or Android Studio's Gradle integration.
+The repository currently does not include the `gradlew` wrapper scripts. Use a compatible local Gradle installation or Android Studio's Gradle integration. The current Android source does not consume a Gemini API key; no `.env` secret setup is required for the present build.
 
 ### Commands
 
