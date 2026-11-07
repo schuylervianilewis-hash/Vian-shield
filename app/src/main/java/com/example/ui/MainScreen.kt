@@ -261,13 +261,13 @@ fun MainScreen(
                             )
                             Spacer(modifier = Modifier.height(8.dp))
                             OutlinedButton(
-                                onClick = { onNavigate(AppScreen.DIAGNOSTICS) },
+                                onClick = { onNavigate(AppScreen.LOG_KEEPER) },
                                 shape = RoundedCornerShape(8.dp),
                                 colors = ButtonDefaults.outlinedButtonColors(contentColor = StatusError),
                                 border = androidx.compose.foundation.BorderStroke(1.dp, StatusError),
                                 modifier = Modifier.align(Alignment.End)
                             ) {
-                                Text("View Diagnostics", fontSize = 12.sp)
+                                Text("View Log Keeper", fontSize = 12.sp)
                             }
                         }
                     }
