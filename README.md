@@ -64,4 +64,4 @@ This repository is in a preparation stage. It does not currently provide traffic
 
 WireGuard profile parsing validates configuration text; it does not connect a tunnel. Profile state is not yet stored in a durable profile repository. Settings persistence and backup formats are also pending.
 
-See the [architecture document](docs/ARCHITECTURE.md) for current component responsibilities, data-retention behavior, limitations, and the proposed future runtime integration contract. Licence and privacy readiness are tracked separately in [Step 5](docs/CLEANUP_CHECKLIST.md#step-5--licensing-and-privacy-preparation).
+See the [architecture document](docs/ARCHITECTURE.md) for current component responsibilities, data-retention behavior, limitations, and the proposed future runtime integration contract. Licence and privacy readiness are tracked separately in [Step 5](docs/CLEANUP_CHECKLIST.md).
