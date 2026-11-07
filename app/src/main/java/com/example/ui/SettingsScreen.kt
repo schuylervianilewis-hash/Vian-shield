@@ -23,7 +23,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Backup
-import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.ListAlt
@@ -68,7 +67,6 @@ import com.example.ui.theme.SkyBlueTextSecondary
 import com.example.ui.theme.SkyBlueTextTertiary
 import com.example.ui.theme.StatusConnected
 import com.example.ui.theme.StatusError
-import com.example.ui.theme.StatusStarting
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -76,7 +74,6 @@ fun SettingsScreen(
     viewModel: DiagnosticViewModel,
     onBack: () -> Unit = {},
     onOpenLogKeeper: () -> Unit = {},
-    onOpenDiagnostics: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     BackHandler { onBack() }
@@ -147,14 +144,31 @@ fun SettingsScreen(
                             }
                             Spacer(modifier = Modifier.width(12.dp))
                             Column {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(
+                                        text = "Log Keeper",
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 15.sp,
+                                        color = SkyBlueTextPrimary
+                                    )
+                                    if (pendingCrashCount > 0) {
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Surface(
+                                            shape = RoundedCornerShape(6.dp),
+                                            color = StatusError
+                                        ) {
+                                            Text(
+                                                text = "$pendingCrashCount Crashes",
+                                                fontSize = 9.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = Color.White,
+                                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                                            )
+                                        }
+                                    }
+                                }
                                 Text(
-                                    text = "Log Keeper",
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 15.sp,
-                                    color = SkyBlueTextPrimary
-                                )
-                                Text(
-                                    text = "Bounded on-device logs, search & export",
+                                    text = "Runtime status, crash reports, bounded logs, search & export",
                                     fontSize = 12.sp,
                                     color = SkyBlueTextSecondary
                                 )
@@ -240,85 +254,7 @@ fun SettingsScreen(
             }
 
             // ================================================================
-            // 2. Diagnostics & Troubleshooting Navigation Row
-            // ================================================================
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable(onClick = onOpenDiagnostics)
-                    .testTag("settings_open_diagnostics_button"),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = SkyBlueSurface),
-                border = androidx.compose.foundation.BorderStroke(1.dp, SkyBlueSurfaceBorder)
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(
-                        modifier = Modifier.weight(1f),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(40.dp)
-                                .background(SkyBluePrimaryContainer, RoundedCornerShape(10.dp)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.BugReport,
-                                contentDescription = null,
-                                tint = SkyBlueOnPrimaryContainer,
-                                modifier = Modifier.size(22.dp)
-                            )
-                        }
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Column {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(
-                                    text = "Diagnostics & Troubleshooting",
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 15.sp,
-                                    color = SkyBlueTextPrimary
-                                )
-                                if (pendingCrashCount > 0) {
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Surface(
-                                        shape = RoundedCornerShape(6.dp),
-                                        color = StatusError
-                                    ) {
-                                        Text(
-                                            text = "$pendingCrashCount Crashes",
-                                            fontSize = 9.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = Color.White,
-                                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
-                                        )
-                                    }
-                                }
-                            }
-                            Text(
-                                text = "Firewall runtime status and diagnostic logs",
-                                fontSize = 12.sp,
-                                color = SkyBlueTextSecondary
-                            )
-                        }
-                    }
-
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.ArrowForward,
-                        contentDescription = "Open Diagnostics",
-                        tint = SkyBluePrimary,
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
-            }
-
-            // ================================================================
-            // 3. Backup & Restoration (Staged / Clean Placeholder)
+            // 2. Backup & Restoration (Staged / Clean Placeholder)
             // ================================================================
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -407,7 +343,7 @@ fun SettingsScreen(
             }
 
             // ================================================================
-            // 4. General Preferences
+            // 3. General Preferences
             // ================================================================
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -466,7 +402,7 @@ fun SettingsScreen(
             }
 
             // ================================================================
-            // 5. App Information
+            // 4. App Information
             // ================================================================
             Card(
                 modifier = Modifier.fillMaxWidth(),

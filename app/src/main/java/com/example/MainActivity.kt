@@ -28,7 +28,6 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 import com.example.ui.AppScreen
-import com.example.ui.DiagnosticsScreen
 import com.example.ui.SpeedPresetScreen
 import com.example.ui.DnsChangerScreen
 import com.example.ui.AdFilterScreen
@@ -156,8 +155,7 @@ class MainActivity : ComponentActivity() {
                                     SettingsScreen(
                                         viewModel = diagnosticViewModel,
                                         onBack = { diagnosticViewModel.navigateTo(AppScreen.MAIN) },
-                                        onOpenLogKeeper = { diagnosticViewModel.navigateTo(AppScreen.LOG_KEEPER) },
-                                        onOpenDiagnostics = { diagnosticViewModel.navigateTo(AppScreen.DIAGNOSTICS) }
+                                        onOpenLogKeeper = { diagnosticViewModel.navigateTo(AppScreen.LOG_KEEPER) }
                                     )
                                 }
                                 else -> {
@@ -173,13 +171,6 @@ class MainActivity : ComponentActivity() {
                             LogKeeperScreen(
                                 viewModel = diagnosticViewModel,
                                 onBack = { diagnosticViewModel.navigateTo(AppScreen.SETTINGS) }
-                            )
-                        }
-                        AppScreen.DIAGNOSTICS -> {
-                            DiagnosticsScreen(
-                                viewModel = diagnosticViewModel,
-                                onBack = { diagnosticViewModel.navigateTo(AppScreen.SETTINGS) },
-                                onOpenLogKeeper = { diagnosticViewModel.navigateTo(AppScreen.LOG_KEEPER) }
                             )
                         }
                         AppScreen.SPEED_PRESET -> SpeedPresetScreen(onBack = { diagnosticViewModel.navigateTo(AppScreen.MAIN) })

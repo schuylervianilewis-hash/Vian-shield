@@ -150,9 +150,6 @@ class VianshieldPhase1Test {
         viewModel.navigateTo(AppScreen.BLOCKED_DOMAINS)
         assertEquals(AppScreen.BLOCKED_DOMAINS, viewModel.currentScreen.value)
 
-        viewModel.navigateTo(AppScreen.DIAGNOSTICS)
-        assertEquals(AppScreen.DIAGNOSTICS, viewModel.currentScreen.value)
-
         viewModel.navigateTo(AppScreen.SETTINGS)
         assertEquals(AppScreen.SETTINGS, viewModel.currentScreen.value)
 

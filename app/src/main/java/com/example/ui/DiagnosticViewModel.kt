@@ -34,8 +34,7 @@ enum class AppScreen {
     AD_FILTER,
     AD_FILTER_WHITELIST,
     BLOCKED_DOMAINS,
-    LOG_KEEPER,
-    DIAGNOSTICS
+    LOG_KEEPER
 }
 
 enum class TimeFilter(val label: String, val durationMs: Long?) {

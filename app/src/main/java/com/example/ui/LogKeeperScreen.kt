@@ -72,6 +72,7 @@ import com.example.ui.theme.StatusConnected
 import com.example.ui.theme.StatusError
 import com.example.ui.theme.StatusStarting
 import com.example.ui.theme.StatusStopped
+import com.example.vpn.VpnState
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -92,6 +93,7 @@ fun LogKeeperScreen(
     val sortNewestFirst by viewModel.sortNewestFirst.collectAsState()
     val hasPendingCrashReports by viewModel.hasPendingCrashReports.collectAsState()
     val pendingCrashCount by viewModel.pendingCrashCount.collectAsState()
+    val vpnState by viewModel.vpnState.collectAsState()
 
     val context = LocalContext.current
     val clipboardManager = LocalClipboardManager.current
@@ -114,7 +116,7 @@ fun LogKeeperScreen(
                     ) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Back to Main"
+                            contentDescription = "Back to Settings"
                         )
                     }
                 },
@@ -209,6 +211,10 @@ fun LogKeeperScreen(
                 .padding(innerPadding)
                 .padding(horizontal = 16.dp)
         ) {
+            Spacer(modifier = Modifier.height(8.dp))
+
+            RuntimeDiagnosticsCard(vpnState = vpnState)
+
             Spacer(modifier = Modifier.height(8.dp))
 
             // Pending Crash Report Banner
@@ -470,7 +476,8 @@ fun LogKeeperScreen(
             if (logEvents.isEmpty()) {
                 Box(
                     modifier = Modifier
-                        .fillMaxSize()
+                        .weight(1f)
+                        .fillMaxWidth()
                         .padding(24.dp),
                     contentAlignment = Alignment.Center
                 ) {
@@ -486,7 +493,7 @@ fun LogKeeperScreen(
                 }
             } else {
                 LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier.weight(1f).fillMaxWidth(),
                     verticalArrangement = Arrangement.spacedBy(6.dp),
                     contentPadding = PaddingValues(bottom = 16.dp)
                 ) {
@@ -497,6 +504,136 @@ fun LogKeeperScreen(
             }
         }
     }
+}
+
+
+@Composable
+private fun RuntimeDiagnosticsCard(vpnState: VpnState) {
+    val status = runtimeStatusSummary(vpnState)
+
+    Card(
+        modifier = Modifier.fillMaxWidth().testTag("runtime_diagnostics_card"),
+        shape = RoundedCornerShape(12.dp),
+        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+    ) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Text(
+                text = "Runtime & Protection Status",
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Surface(
+                    shape = RoundedCornerShape(6.dp),
+                    color = status.color.copy(alpha = 0.14f)
+                ) {
+                    Text(
+                        text = status.label,
+                        color = status.color,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 11.sp,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = status.protectionSummary,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+            RuntimeDiagnosticRow("Firewall runtime", status.runtimeSummary)
+            RuntimeDiagnosticRow(
+                "WireGuard profiles",
+                "Profile management only; tunnel runtime is pending"
+            )
+            if (vpnState is VpnState.Error) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = MaterialTheme.colorScheme.errorContainer,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = "[${vpnState.errorCode}] ${vpnState.message}",
+                        color = MaterialTheme.colorScheme.onErrorContainer,
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.padding(10.dp)
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun RuntimeDiagnosticRow(label: String, value: String) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp),
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Text(
+            text = label,
+            fontSize = 11.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Text(
+            text = value,
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Medium,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+    }
+}
+
+private data class RuntimeStatusSummary(
+    val color: androidx.compose.ui.graphics.Color,
+    val label: String,
+    val protectionSummary: String,
+    val runtimeSummary: String
+)
+
+private fun runtimeStatusSummary(vpnState: VpnState): RuntimeStatusSummary = when (vpnState) {
+    is VpnState.RuntimePending -> RuntimeStatusSummary(
+        StatusStarting,
+        "Integration pending",
+        "No firewall protection is active.",
+        "Not integrated"
+    )
+    is VpnState.Connected -> RuntimeStatusSummary(
+        StatusConnected,
+        "Connected",
+        "A tunnel is reporting a connected state.",
+        "Integrated"
+    )
+    is VpnState.Starting -> RuntimeStatusSummary(
+        StatusStarting,
+        "Starting",
+        "Protection is not active until connection completes.",
+        "Integrated"
+    )
+    is VpnState.Stopping -> RuntimeStatusSummary(
+        StatusStarting,
+        "Stopping",
+        "The tunnel is stopping; protection should not be assumed.",
+        "Integrated"
+    )
+    is VpnState.Stopped -> RuntimeStatusSummary(
+        StatusStopped,
+        "Stopped",
+        "No firewall protection is active.",
+        "Integrated"
+    )
+    is VpnState.Error -> RuntimeStatusSummary(
+        StatusError,
+        "Error",
+        "Runtime reported an error; protection is unavailable.",
+        "Integrated"
+    )
 }
 
 @Composable
