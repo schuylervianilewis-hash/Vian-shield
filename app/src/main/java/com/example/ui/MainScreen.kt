@@ -112,31 +112,12 @@ fun MainScreen(
         topBar = {
             CenterAlignedTopAppBar(
                 title = {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.Center
-                    ) {
-                        Text(
-                            text = "Vianshield",
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 20.sp,
-                            color = SkyBlueTextPrimary
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Surface(
-                            shape = RoundedCornerShape(12.dp),
-                            color = SkyBluePrimaryContainer,
-                            modifier = Modifier.padding(vertical = 2.dp)
-                        ) {
-                            Text(
-                                text = "Runtime Pending",
-                                color = SkyBlueOnPrimaryContainer,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
-                            )
-                        }
-                    }
+                    Text(
+                        text = "Vianshield",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 20.sp,
+                        color = SkyBlueTextPrimary
+                    )
                 },
                 colors = TopAppBarDefaults.centerAlignedTopAppBarColors(containerColor = SkyBlueSurface)
             )
@@ -146,9 +127,8 @@ fun MainScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp),
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             // ================================================================
@@ -176,14 +156,14 @@ fun MainScreen(
 
             Text(
                 text = "Quick Settings",
-                modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
+                modifier = Modifier.fillMaxWidth().padding(top = 0.dp),
                 fontWeight = FontWeight.Bold,
-                fontSize = 16.sp,
+                fontSize = 14.sp,
                 color = SkyBlueTextPrimary
             )
 
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     DashboardActionCard(
                         icon = Icons.Default.Speed,
                         title = "Speed Preset",
@@ -201,7 +181,7 @@ fun MainScreen(
                         onClick = { onNavigate(AppScreen.DNS_CHANGER) }
                     )
                 }
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     DashboardActionCard(
                         icon = Icons.Default.Block,
                         title = "Ad Filter",
@@ -220,12 +200,6 @@ fun MainScreen(
                     )
                 }
             }
-
-            // 6. Actual Protection Status and Relevant Errors
-            ConnectionStatusCard(
-                vpnState = vpnState,
-                activeProfile = activeProfile
-            )
 
             // Error Banner (shown if VPN is in Error state)
             AnimatedVisibility(visible = vpnState is VpnState.Error) {
@@ -289,24 +263,30 @@ private fun DashboardActionCard(
     onClick: () -> Unit
 ) {
     Card(
-        modifier = modifier.heightIn(min = 116.dp).clickable(onClick = onClick).testTag(testTag),
-        shape = RoundedCornerShape(16.dp),
+        modifier = modifier.height(72.dp).clickable(onClick = onClick).testTag(testTag),
+        shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(containerColor = SkyBlueSurface),
         border = androidx.compose.foundation.BorderStroke(1.dp, SkyBlueSurfaceBorder),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
-        Column(
-            modifier = Modifier.fillMaxWidth().padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+        Row(
+            modifier = Modifier.fillMaxSize().padding(horizontal = 10.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Box(
-                modifier = Modifier.size(36.dp).clip(RoundedCornerShape(10.dp)).background(SkyBluePrimaryContainer),
+                modifier = Modifier.size(30.dp).clip(RoundedCornerShape(8.dp)).background(SkyBluePrimaryContainer),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(icon, contentDescription = null, tint = SkyBluePrimary, modifier = Modifier.size(20.dp))
+                Icon(icon, contentDescription = null, tint = SkyBluePrimary, modifier = Modifier.size(17.dp))
             }
-            Text(title, fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = SkyBlueTextPrimary)
-            Text(description, fontSize = 11.sp, color = SkyBlueTextSecondary)
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(2.dp)
+            ) {
+                Text(title, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = SkyBlueTextPrimary)
+                Text(description, fontSize = 10.sp, color = SkyBlueTextSecondary, maxLines = 1)
+            }
         }
     }
 }
@@ -327,13 +307,13 @@ private fun PrimaryActionButton(
         else -> Color(0xFF94A3B8)
     }
 
-    val (statusLabel, statusTag) = when {
-        vpnState is VpnState.Starting -> "CONNECTING" to "Negotiating"
-        vpnState is VpnState.Stopping -> "DISCONNECTING" to "Teardown"
-        isConnected -> "FIREWALL ACTIVE" to "Protected"
-        vpnState is VpnState.Error -> "PROTECTION ERROR" to "Failed"
-        vpnState is VpnState.RuntimePending -> "FIREWALL PENDING" to "Integration pending"
-        else -> "FIREWALL OFF" to "Standby"
+    val statusLabel = when {
+        vpnState is VpnState.Starting -> "CONNECTING"
+        vpnState is VpnState.Stopping -> "DISCONNECTING"
+        isConnected -> "FIREWALL ACTIVE"
+        vpnState is VpnState.Error -> "PROTECTION ERROR"
+        vpnState is VpnState.RuntimePending -> "FIREWALL PENDING"
+        else -> "FIREWALL OFF"
     }
 
     val subtitle = when {
@@ -346,13 +326,13 @@ private fun PrimaryActionButton(
         vpnState is VpnState.Starting -> "Establishing secure UDP tunnel..."
         vpnState is VpnState.Stopping -> "Stopping VPN tunnel..."
         vpnState is VpnState.Error -> "Failed to establish tunnel"
-        vpnState is VpnState.RuntimePending -> "Firewall runtime integration is pending. No protection is active."
-        else -> "Firewall runtime integration is pending. No protection is active."
+        vpnState is VpnState.RuntimePending -> "Runtime pending · No protection active"
+        else -> "No protection active"
     }
 
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
+        shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = SkyBlueSurface),
         border = androidx.compose.foundation.BorderStroke(
             1.dp,
@@ -360,13 +340,10 @@ private fun PrimaryActionButton(
         )
     ) {
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 22.dp, horizontal = 16.dp),
+            modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp, horizontal = 14.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            // Status Tag Header
             Surface(
                 shape = RoundedCornerShape(8.dp),
                 color = when {
@@ -377,26 +354,23 @@ private fun PrimaryActionButton(
                 }
             ) {
                 Row(
-                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                    modifier = Modifier.padding(horizontal = 9.dp, vertical = 3.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     Box(
-                        modifier = Modifier
-                            .size(7.dp)
-                            .clip(CircleShape)
-                            .background(
-                                when {
-                                    isConnected -> StatusConnected
-                                    isTransitioning -> StatusStarting
-                                    vpnState is VpnState.Error -> StatusError
-                                    else -> SkyBlueTextTertiary
-                                }
-                            )
+                        modifier = Modifier.size(6.dp).clip(CircleShape).background(
+                            when {
+                                isConnected -> StatusConnected
+                                isTransitioning -> StatusStarting
+                                vpnState is VpnState.Error -> StatusError
+                                else -> SkyBlueTextTertiary
+                            }
+                        )
                     )
                     Text(
                         text = statusLabel,
-                        fontSize = 11.sp,
+                        fontSize = 10.sp,
                         fontWeight = FontWeight.Bold,
                         color = when {
                             isConnected -> StatusConnected
@@ -404,14 +378,13 @@ private fun PrimaryActionButton(
                             vpnState is VpnState.Error -> StatusError
                             else -> SkyBlueTextSecondary
                         },
-                        letterSpacing = 0.8.sp
+                        letterSpacing = 0.6.sp
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.height(18.dp))
+            Spacer(modifier = Modifier.height(8.dp))
 
-            // Big Hollow PC Power Button (~150dp diameter, Option B)
             val buttonBg = when {
                 isConnected -> Color(0xFFF0FDF4)
                 isTransitioning -> Color(0xFFFFFBEB)
@@ -427,7 +400,7 @@ private fun PrimaryActionButton(
 
             Box(
                 modifier = Modifier
-                    .size(150.dp)
+                    .size(92.dp)
                     .clip(CircleShape)
                     .background(buttonBg)
                     .border(
@@ -439,13 +412,10 @@ private fun PrimaryActionButton(
                     .testTag("vpn_toggle_button"),
                 contentAlignment = Alignment.Center
             ) {
-                // Classic Hollow PC Power Symbol (IEC 5009)
-                Canvas(modifier = Modifier.size(76.dp)) {
-                    val strokeWidth = 6.dp.toPx()
+                Canvas(modifier = Modifier.size(48.dp)) {
+                    val strokeWidth = 4.dp.toPx()
                     val r = size.minDimension * 0.40f
                     val arcCenter = Offset(size.width / 2f, size.height / 2f + r * 0.08f)
-
-                    // Broken circle arc with 60-degree gap at 12 o'clock (-120° to -60°)
                     drawArc(
                         color = iconColor,
                         startAngle = -60f,
@@ -455,8 +425,6 @@ private fun PrimaryActionButton(
                         size = Size(r * 2f, r * 2f),
                         style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
                     )
-
-                    // Vertical line through the top gap down to center
                     drawLine(
                         color = iconColor,
                         start = Offset(arcCenter.x, arcCenter.y - r * 1.25f),
@@ -467,12 +435,10 @@ private fun PrimaryActionButton(
                 }
             }
 
-            Spacer(modifier = Modifier.height(18.dp))
-
-            // Subtitle information
+            Spacer(modifier = Modifier.height(7.dp))
             Text(
                 text = subtitle,
-                fontSize = 12.sp,
+                fontSize = 11.sp,
                 fontWeight = if (isConnected) FontWeight.SemiBold else FontWeight.Normal,
                 color = if (isConnected) StatusConnected else SkyBlueTextSecondary,
                 textAlign = TextAlign.Center
@@ -481,129 +447,3 @@ private fun PrimaryActionButton(
     }
 }
 
-@Composable
-private fun ConnectionStatusCard(
-    vpnState: VpnState,
-    activeProfile: com.example.config.WireGuardProfile?
-) {
-    val (statusColor, statusText, statusIcon) = when (vpnState) {
-        is VpnState.Connected -> Triple(StatusConnected, "Protection Active", Icons.Default.CheckCircle)
-        is VpnState.Starting -> Triple(StatusStarting, "Establishing Tunnel...", Icons.Default.HourglassEmpty)
-        is VpnState.Stopping -> Triple(StatusStarting, "Stopping Tunnel...", Icons.Default.HourglassEmpty)
-        is VpnState.Error -> Triple(StatusError, "Protection Error", Icons.Default.Error)
-        is VpnState.Stopped -> Triple(StatusStopped, "Protection Inactive", Icons.Default.Stop)
-        is VpnState.RuntimePending -> Triple(StatusStarting, "Firewall Runtime Pending", Icons.Default.HourglassEmpty)
-    }
-
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = SkyBlueSurface),
-        border = androidx.compose.foundation.BorderStroke(1.dp, SkyBlueSurfaceBorder),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(18.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(60.dp)
-                    .clip(CircleShape)
-                    .background(statusColor.copy(alpha = 0.12f))
-                    .border(2.dp, statusColor.copy(alpha = 0.3f), CircleShape),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = statusIcon,
-                    contentDescription = statusText,
-                    tint = statusColor,
-                    modifier = Modifier.size(32.dp)
-                )
-            }
-
-            Spacer(modifier = Modifier.height(10.dp))
-
-            Text(
-                text = statusText,
-                fontWeight = FontWeight.Bold,
-                fontSize = 18.sp,
-                color = SkyBlueTextPrimary
-            )
-
-            Spacer(modifier = Modifier.height(4.dp))
-
-            val subtitle = when (vpnState) {
-                is VpnState.Connected -> "Firewall runtime reported connected"
-                is VpnState.Starting -> "Starting VPN runtime"
-                is VpnState.Stopping -> "Stopping VPN runtime"
-                is VpnState.Error -> vpnState.message
-                is VpnState.Stopped -> "Firewall runtime is stopped"
-                is VpnState.RuntimePending -> "Firewall runtime integration is pending. No protection is active."
-            }
-
-            Text(
-                text = subtitle,
-                fontSize = 12.sp,
-                color = SkyBlueTextSecondary,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.padding(horizontal = 8.dp)
-            )
-
-            Spacer(modifier = Modifier.height(10.dp))
-
-            if (activeProfile != null) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(SkyBlueSurfaceVariant, RoundedCornerShape(8.dp))
-                        .padding(horizontal = 12.dp, vertical = 6.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "Profile: ${activeProfile.name}",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = SkyBlueTextPrimary
-                    )
-                    Text(
-                        text = "${activeProfile.endpointHost}:${activeProfile.endpointPort}",
-                        fontSize = 11.sp,
-                        color = SkyBlueTextSecondary,
-                        fontFamily = FontFamily.Monospace
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            // Native Core Status Pill
-            Surface(
-                shape = RoundedCornerShape(8.dp),
-                color = SkyBlueSurfaceVariant
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 3.dp)
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(6.dp)
-                            .clip(CircleShape)
-                            .background(StatusStarting)
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(
-                        text = "Firewall runtime integration pending",
-                        fontSize = 10.sp,
-                        color = SkyBlueTextSecondary,
-                        fontWeight = FontWeight.Medium
-                    )
-                }
-            }
-        }
-    }
-}
