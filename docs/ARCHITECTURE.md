@@ -165,6 +165,7 @@ The chosen storage technology and schema belong to Step 4. Avoid unnecessary mig
 - The Android backup rules remain templates; Backup/Restore is unavailable.
 - Physical-device UI review remains an acceptance task. CI success alone is not device validation.
 - Licence compatibility and privacy disclosures have not yet been audited; see Step 5.
+- `metadata.json` still contains a generated `majorCapabilities` entry for a server-side Gemini API. No corresponding Gemini API use was found in the current Android source. The descriptive text was corrected, but the capability field is left for a separate metadata-format review rather than changing an unverified generated schema.
 
 ## 7. Related records
 
