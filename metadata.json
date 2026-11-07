@@ -1,6 +1,8 @@
 {
   "name": "Vianshield",
-  "description": "Android firewall and VPN application powered by sing-box engine with operational diagnostics.",
+  "description": "Vianshield Android firewall application shell with WireGuard profile parsing and operational diagnostics; firewall and VPN runtime enforcement are not integrated.",
   "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
 }
